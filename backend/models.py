@@ -18,6 +18,7 @@ class Trainee(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     unique_name = Column(Text, unique=True, nullable=False)
+    email = Column(Text, nullable=True)
     registered_by = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -45,6 +46,8 @@ class Attendance(Base):
     date = Column(Date, nullable=False, default=date.today)
     checkin_time = Column(DateTime, nullable=True)
     checkout_time = Column(DateTime, nullable=True)
+    checkin_image = Column(Text, nullable=True)
+    checkout_image = Column(Text, nullable=True)
     status = Column(Text, default="present")
 
     trainee = relationship("Trainee", back_populates="attendance_records", lazy="select")

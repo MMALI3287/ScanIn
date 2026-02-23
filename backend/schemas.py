@@ -21,7 +21,8 @@ class TokenResponse(BaseModel):
 # Trainees
 class TraineeSelfRegister(BaseModel):
     unique_name: str
-    embeddings: list[list[float]]
+    frames: list[str]
+    email: str | None = None
 
 
 class TraineeAdminRegister(BaseModel):
@@ -32,6 +33,7 @@ class TraineeAdminRegister(BaseModel):
 class TraineeOut(BaseModel):
     id: int
     unique_name: str
+    email: str | None = None
     registered_by: str
     created_at: datetime
 
@@ -50,6 +52,8 @@ class AttendanceOut(BaseModel):
     date: date
     checkin_time: datetime | None = None
     checkout_time: datetime | None = None
+    checkin_image: str | None = None
+    checkout_image: str | None = None
     status: str
 
     model_config = {"from_attributes": True}

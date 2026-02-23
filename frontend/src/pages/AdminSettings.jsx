@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSettings, updateSetting } from "../services/api";
+import AdminLayout from "../components/AdminLayout";
 
 export default function AdminSettings() {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState([]);
+
   const [loading, setLoading] = useState(true);
-  const [workStart, setWorkStart] = useState("09:00");
-  const [threshold, setThreshold] = useState("0.75");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+
+  const [workStart, setWorkStart] = useState("09:00");
+  const [gracePeriod, setGracePeriod] = useState("10");
+  const [threshold, setThreshold] = useState("0.75");
 
   useEffect(() => {
     fetchSettings();
@@ -18,12 +20,10 @@ export default function AdminSettings() {
   const fetchSettings = async () => {
     try {
       const res = await getSettings();
-      const data = res.data.data || [];
-      setSettings(data);
-      const ws = data.find((s) => s.key === "work_start_time");
-      if (ws) setWorkStart(ws.value);
-      const th = data.find((s) => s.key === "similarity_threshold");
-      if (th) setThreshold(th.value);
+      const data = res.data.data || {};
+      if (data.work_start_time) setWorkStart(data.work_start_time);
+      if (data.grace_period_minutes) setGracePeriod(data.grace_period_minutes);
+      if (data.similarity_threshold) setThreshold(data.similarity_threshold);
     } catch (err) {
       if (err.response?.status === 401) {
         localStorage.removeItem("attendance_token");
@@ -34,89 +34,65 @@ export default function AdminSettings() {
     }
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage("");
-    try {
-      await updateSetting("work_start_time", workStart);
-      await updateSetting("similarity_threshold", threshold);
-      setMessage("Settings saved.");
-    } catch (err) {
-      setMessage("Failed to save settings.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("attendance_token");
-    navigate("/admin/login");
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow px-6 py-3 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Settings</h1>
-        <div className="flex gap-4 text-sm">
-          <a
-            href="/admin/dashboard"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            Today
-          </a>
-          <a
-            href="/admin/history"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            History
-          </a>
-          <a
-            href="/admin/trainees"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            Trainees
-          </a>
-          <a
-            href="/admin/reports"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            Reports
-          </a>
-          <a href="/admin/settings" className="text-blue-600 font-medium">
-            Settings
-          </a>
-          <button
-            onClick={handleLogout}
-            className="text-red-600 hover:underline"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
+    <AdminLayout title="Settings">
+      {({ setToast }) => {
+        const handleSave = async () => {
+          setSaving(true);
+          try {
+            await updateSetting("work_start_time", workStart);
+            await updateSetting("grace_period_minutes", gracePeriod);
+            await updateSetting("similarity_threshold", threshold);
+            setToast({ type: "success", text: "Settings saved." });
+          } catch (err) {
+            setToast({ type: "error", text: "Failed to save settings." });
+          } finally {
+            setSaving(false);
+          }
+        };
 
-      <div className="max-w-lg mx-auto p-6">
-        {loading ? (
-          <p className="text-gray-500">Loading...</p>
+        return loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-400 mb-1">
                 Work Start Time
               </label>
               <input
                 type="time"
                 value={workStart}
                 onChange={(e) => setWorkStart(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Trainees checking in after this + 10 min grace are marked
+                Trainees arriving after this time + grace period are marked
                 "late".
               </p>
             </div>
 
+            <div className="mb-5">
+              <label className="block text-sm font-medium text-gray-400 mb-1">
+                Grace Period (minutes)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="120"
+                value={gracePeriod}
+                onChange={(e) => setGracePeriod(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Minutes after work start time before marking as late. Default:
+                10.
+              </p>
+            </div>
+
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-400 mb-1">
                 Face Similarity Threshold
               </label>
               <input
@@ -126,29 +102,23 @@ export default function AdminSettings() {
                 max="1.0"
                 value={threshold}
                 onChange={(e) => setThreshold(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Higher = stricter matching. Default: 0.75
+                Higher = stricter matching. Default: 0.75.
               </p>
             </div>
 
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 rounded-lg transition"
+              className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:bg-cyan-800 text-white font-semibold py-2.5 rounded-lg transition cursor-pointer disabled:cursor-not-allowed"
             >
-              {saving ? "Saving..." : "Save Settings"}
+              {saving ? "Saving…" : "Save Settings"}
             </button>
-
-            {message && (
-              <p className="mt-3 text-green-600 text-center text-sm">
-                {message}
-              </p>
-            )}
           </div>
-        )}
-      </div>
-    </div>
+        );
+      }}
+    </AdminLayout>
   );
 }

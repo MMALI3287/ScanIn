@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/v1/settings", tags=["settings"])
 @router.get("", response_model=APIResponse)
 async def get_settings(db: Session = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     settings = db.query(Setting).all()
-    data = [SettingOut.model_validate(s).model_dump() for s in settings]
+    data = {s.key: s.value for s in settings}
     return APIResponse(success=True, data=data, message="Settings retrieved")
 
 

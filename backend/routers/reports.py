@@ -54,30 +54,38 @@ async def export_report(
 
 def generate_excel(rows: list[dict], from_date: date, to_date: date) -> StreamingResponse:
     from openpyxl import Workbook
+    from openpyxl.styles import Font
+    from openpyxl.utils import get_column_letter
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Attendance Report"
 
-    ws.append(["Attendance Report", f"{from_date} to {to_date}"])
-    ws.append([])
+    headers = ["Name", "Date", "Check-in", "Check-out", "Status"]
+    ws.append(headers)
+    bold = Font(bold=True)
+    for col_idx in range(1, len(headers) + 1):
+        ws.cell(row=1, column=col_idx).font = bold
 
-    if rows:
-        headers = list(rows[0].keys())
-        ws.append(headers)
-        for row in rows:
-            ws.append([row[h] for h in headers])
-    else:
-        ws.append(["No records found"])
+    for row in rows:
+        ws.append([row[h] for h in headers])
+
+    for col_idx in range(1, len(headers) + 1):
+        max_len = max(
+            len(str(ws.cell(row=r, column=col_idx).value or ""))
+            for r in range(1, ws.max_row + 1)
+        )
+        ws.column_dimensions[get_column_letter(col_idx)].width = max_len + 3
 
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
 
+    fn = f"attendance_{from_date.strftime('%Y%m%d')}_{to_date.strftime('%Y%m%d')}.xlsx"
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=attendance_{from_date}_{to_date}.xlsx"},
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
     )
 
 
@@ -95,28 +103,44 @@ def generate_pdf(rows: list[dict], from_date: date, to_date: date) -> StreamingR
     elements.append(Paragraph(f"Attendance Report: {from_date} to {to_date}", styles["Title"]))
     elements.append(Spacer(1, 20))
 
+    headers = ["Name", "Date", "Check-in", "Check-out", "Status"]
     if rows:
-        headers = list(rows[0].keys())
         table_data = [headers] + [[row[h] for h in headers] for row in rows]
-        table = Table(table_data)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-            ("GRID", (0, 0), (-1, -1), 1, colors.black),
-        ]))
-        elements.append(table)
     else:
-        elements.append(Paragraph("No records found for this period.", styles["Normal"]))
+        table_data = [headers, ["No records", "", "", "", ""]]
+
+    table = Table(table_data)
+
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+    ]
+
+    status_colors = {
+        "present": colors.HexColor("#dcfce7"),
+        "late": colors.HexColor("#fef9c3"),
+        "absent": colors.HexColor("#fee2e2"),
+    }
+    for i, row in enumerate(rows):
+        bg = status_colors.get(row.get("Status", "").lower())
+        if bg:
+            style_cmds.append(("BACKGROUND", (0, i + 1), (-1, i + 1), bg))
+
+    table.setStyle(TableStyle(style_cmds))
+    elements.append(table)
 
     doc.build(elements)
     buffer.seek(0)
 
+    fn = f"attendance_{from_date.strftime('%Y%m%d')}_{to_date.strftime('%Y%m%d')}.pdf"
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=attendance_{from_date}_{to_date}.pdf"},
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
     )

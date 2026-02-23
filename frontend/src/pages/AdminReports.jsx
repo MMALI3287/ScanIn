@@ -1,14 +1,30 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { exportReport } from "../services/api";
+import AdminLayout from "../components/AdminLayout";
+
+function getWeekRange() {
+  const now = new Date();
+  const day = now.getDay();
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - ((day + 6) % 7));
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const fmt = (d) => d.toISOString().split("T")[0];
+  return { from: fmt(mon), to: fmt(sun) };
+}
 
 export default function AdminReports() {
   const navigate = useNavigate();
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [loading, setLoading] = useState(false);
+  const week = getWeekRange();
+
+  const [fromDate, setFromDate] = useState(week.from);
+  const [toDate, setToDate] = useState(week.to);
+  const [loadingExcel, setLoadingExcel] = useState(false);
+  const [loadingPdf, setLoadingPdf] = useState(false);
 
   const handleExport = async (format) => {
+    const setLoading = format === "excel" ? setLoadingExcel : setLoadingPdf;
     setLoading(true);
     try {
       const res = await exportReport(
@@ -16,12 +32,24 @@ export default function AdminReports() {
         fromDate || undefined,
         toDate || undefined,
       );
-      const url = window.URL.createObjectURL(res.data);
+      const mimeType =
+        format === "excel"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : "application/pdf";
+      const blob = new Blob([res.data], { type: mimeType });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
-      a.download = `attendance_report.${format === "excel" ? "xlsx" : "pdf"}`;
+      const f = fromDate.replace(/-/g, "");
+      const t = toDate.replace(/-/g, "");
+      a.download = `attendance_${f}_${t}.${format === "excel" ? "xlsx" : "pdf"}`;
+      document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 200);
     } catch (err) {
       if (err.response?.status === 401) {
         localStorage.removeItem("attendance_token");
@@ -34,105 +62,81 @@ export default function AdminReports() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("attendance_token");
-    navigate("/admin/login");
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow px-6 py-3 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-800">Export Reports</h1>
-        <div className="flex gap-4 text-sm">
-          <a
-            href="/admin/dashboard"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            Today
-          </a>
-          <a
-            href="/admin/history"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            History
-          </a>
-          <a
-            href="/admin/trainees"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            Trainees
-          </a>
-          <a href="/admin/reports" className="text-blue-600 font-medium">
-            Reports
-          </a>
-          <a
-            href="/admin/settings"
-            className="text-gray-600 hover:text-blue-600"
-          >
-            Settings
-          </a>
+    <AdminLayout title="Export Reports">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+        <div className="flex gap-4 mb-6">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-4">
           <button
-            onClick={handleLogout}
-            className="text-red-600 hover:underline"
+            onClick={() => handleExport("excel")}
+            disabled={loadingExcel}
+            className="flex-1 bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-white font-semibold py-2.5 rounded-lg transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Logout
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+            {loadingExcel ? "Exporting…" : "Excel"}
+          </button>
+          <button
+            onClick={() => handleExport("pdf")}
+            disabled={loadingPdf}
+            className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-red-800 text-white font-semibold py-2.5 rounded-lg transition cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+              />
+            </svg>
+            {loadingPdf ? "Exporting…" : "PDF"}
           </button>
         </div>
-      </nav>
 
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">
-            Select Date Range
-          </h2>
-
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                From
-              </label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                To
-              </label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => handleExport("excel")}
-              disabled={loading}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-semibold py-2 rounded-lg transition"
-            >
-              {loading ? "Exporting..." : "Export Excel"}
-            </button>
-            <button
-              onClick={() => handleExport("pdf")}
-              disabled={loading}
-              className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold py-2 rounded-lg transition"
-            >
-              {loading ? "Exporting..." : "Export PDF"}
-            </button>
-          </div>
-
-          <p className="text-sm text-gray-500 mt-4">
-            Leave dates empty to export the current week.
-          </p>
-        </div>
+        <p className="text-xs text-gray-500 mt-4">
+          Defaults to current week (Mon–Sun).
+        </p>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

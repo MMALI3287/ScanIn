@@ -1,13 +1,23 @@
-import os
+import io
 import json
-import httpx
+import base64
 import numpy as np
-from dotenv import load_dotenv
+import torch
+from PIL import Image
+from facenet_pytorch import MTCNN, InceptionResnetV1
+from sqlalchemy.orm import Session
 
-load_dotenv()
-
-HF_API_KEY = os.getenv("HF_API_KEY", "")
-HF_MODEL_URL = os.getenv("HF_MODEL_URL", "https://api-inference.huggingface.co/models/sentence-transformers/clip-ViT-B-32")
+print("Loading FaceNet model (MTCNN + InceptionResnetV1)...")
+_mtcnn = MTCNN(
+    image_size=160,
+    margin=40,
+    keep_all=False,
+    post_process=True,
+    min_face_size=20,
+    thresholds=[0.5, 0.6, 0.6],
+)
+_resnet = InceptionResnetV1(pretrained="vggface2").eval()
+print("FaceNet model loaded.")
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -22,46 +32,48 @@ def average_embeddings(embeddings: list[list[float]]) -> list[float]:
     return np.mean(embeddings, axis=0).tolist()
 
 
-async def get_embedding_from_base64(image_base64: str) -> list[float]:
-    import base64
-    image_bytes = base64.b64decode(image_base64)
+async def get_embedding(base64_image: str) -> list[float]:
+    image_bytes = base64.b64decode(base64_image)
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            HF_MODEL_URL,
-            headers={"Authorization": f"Bearer {HF_API_KEY}"},
-            content=image_bytes,
+    # Scale up small images so MTCNN can detect faces reliably
+    min_dim = min(image.size)
+    if min_dim < 400:
+        scale = 400 / min_dim
+        image = image.resize(
+            (int(image.width * scale), int(image.height * scale)),
+            Image.LANCZOS,
         )
 
-    if response.status_code != 200:
-        raise ValueError(f"HuggingFace API error: {response.status_code} - {response.text}")
+    face_tensor = _mtcnn(image)
+    if face_tensor is None:
+        raise ValueError("No face detected in image. Please ensure your face is clearly visible.")
 
-    result = response.json()
-
-    if isinstance(result, list) and len(result) > 0:
-        if isinstance(result[0], float):
-            return result
-        if isinstance(result[0], list):
-            return result[0]
-
-    raise ValueError(f"Unexpected HuggingFace response format: {result}")
+    with torch.no_grad():
+        embedding = _resnet(face_tensor.unsqueeze(0)).squeeze().tolist()
+    return embedding
 
 
-def find_best_match(
-    new_embedding: list[float],
-    stored_embeddings: list[dict],
-    threshold: float = 0.75,
-) -> dict | None:
-    best_match = None
+def find_best_match(new_embedding: list[float], db: Session):
+    from models import FaceEmbedding, Trainee, Setting
+
+    threshold = 0.6
+    similarity_setting = db.query(Setting).filter(Setting.key == "similarity_threshold").first()
+    if similarity_setting:
+        threshold = float(similarity_setting.value)
+
+    all_face_rows = db.query(FaceEmbedding).all()
+
+    best_trainee_id = None
     best_score = -1.0
 
-    for entry in stored_embeddings:
-        stored = json.loads(entry["embedding"]) if isinstance(entry["embedding"], str) else entry["embedding"]
+    for row in all_face_rows:
+        stored = json.loads(row.embedding) if isinstance(row.embedding, str) else row.embedding
         score = cosine_similarity(new_embedding, stored)
         if score > best_score:
             best_score = score
-            best_match = entry
+            best_trainee_id = row.trainee_id
 
-    if best_score >= threshold:
-        return {"trainee_id": best_match["trainee_id"], "score": best_score}
+    if best_score >= threshold and best_trainee_id is not None:
+        return db.query(Trainee).filter(Trainee.id == best_trainee_id).first()
     return None

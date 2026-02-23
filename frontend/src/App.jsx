@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import KioskPage from "./pages/KioskPage";
 import RegisterPage from "./pages/RegisterPage";
+import UserHistoryPage from "./pages/UserHistoryPage";
 import AdminLoginPage from "./pages/AdminLoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminHistory from "./pages/AdminHistory";
@@ -15,9 +16,10 @@ function App() {
       <Routes>
         <Route path="/" element={<KioskPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/history" element={<UserHistoryPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route
-          path="/admin/dashboard"
+          path="/admin"
           element={
             <ProtectedRoute>
               <AdminDashboard />

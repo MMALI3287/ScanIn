@@ -1,127 +1,506 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import Webcam from "react-webcam";
+import { useNavigate } from "react-router-dom";
 import { registerSelf } from "../services/api";
+import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+
+const POSES = [
+  {
+    label: "Look straight at the camera",
+    icon: "●",
+    yaw: [-0.15, 0.15],
+    pitch: [0.35, 0.72],
+  },
+  {
+    label: "Turn your head slightly left",
+    icon: "←",
+    yaw: [0.12, Infinity],
+    pitch: [0.2, 0.85],
+  },
+  {
+    label: "Turn your head slightly right",
+    icon: "→",
+    yaw: [-Infinity, -0.12],
+    pitch: [0.2, 0.85],
+  },
+  {
+    label: "Tilt your head slightly up",
+    icon: "↑",
+    yaw: [-0.22, 0.22],
+    pitch: [-Infinity, 0.43],
+  },
+  {
+    label: "Tilt your head slightly down",
+    icon: "↓",
+    yaw: [-0.22, 0.22],
+    pitch: [0.63, Infinity],
+  },
+];
+
+const HOLD_MS = 1000;
+
+function computePose(landmarks) {
+  const nose = landmarks[1];
+  const lEye = landmarks[33];
+  const rEye = landmarks[263];
+  const chin = landmarks[152];
+
+  const ecX = (lEye.x + rEye.x) / 2;
+  const ew = Math.abs(rEye.x - lEye.x) || 0.001;
+  const ecY = (lEye.y + rEye.y) / 2;
+  const fh = Math.abs(chin.y - ecY) || 0.001;
+
+  return {
+    yaw: (nose.x - ecX) / ew,
+    pitch: (nose.y - ecY) / fh,
+  };
+}
 
 export default function RegisterPage() {
   const webcamRef = useRef(null);
-  const [name, setName] = useState("");
-  const [captures, setCaptures] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  const capture = useCallback(() => {
-    const screenshot = webcamRef.current?.getScreenshot();
-    if (screenshot) {
-      const base64 = screenshot.split(",")[1];
-      setCaptures((prev) => [...prev, base64]);
-    }
+  const landmarkerRef = useRef(null);
+  const rafRef = useRef(null);
+  const holdStartRef = useRef(null);
+  const flashRef = useRef(false);
+  const poseIdxRef = useRef(0);
+  const framesCollected = useRef([]);
+  const lastTsRef = useRef(0);
+
+  const [phase, setPhase] = useState("loading");
+  const [modelLoaded, setModelLoaded] = useState(false);
+  const [poseIndex, setPoseIndex] = useState(0);
+  const [frameCount, setFrameCount] = useState(0);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [holdPct, setHoldPct] = useState(0);
+  const [faceStatus, setFaceStatus] = useState("none");
+  const [flash, setFlash] = useState(false);
+
+  // Load FaceLandmarker from CDN
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm",
+        );
+        if (cancelled) return;
+        const lm = await FaceLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+            delegate: "GPU",
+          },
+          runningMode: "VIDEO",
+          numFaces: 1,
+        });
+        if (cancelled) return;
+        landmarkerRef.current = lm;
+        setModelLoaded(true);
+        setPhase("camera");
+      } catch (e) {
+        console.error("FaceLandmarker load failed:", e);
+        if (!cancelled) setPhase("camera");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (landmarkerRef.current) {
+        landmarkerRef.current.close();
+        landmarkerRef.current = null;
+      }
+    };
   }, []);
+
+  // Detection loop
+  useEffect(() => {
+    if (phase !== "camera") return;
+
+    const loop = () => {
+      if (flashRef.current) {
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
+      const video = webcamRef.current?.video;
+      const lm = landmarkerRef.current;
+
+      if (video && lm && video.readyState >= 2) {
+        const now = performance.now();
+        if (now <= lastTsRef.current) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        lastTsRef.current = now;
+
+        try {
+          const result = lm.detectForVideo(video, now);
+
+          if (result.faceLandmarks?.length > 0) {
+            const pose = computePose(result.faceLandmarks[0]);
+            const cfg = POSES[poseIdxRef.current];
+            const matches =
+              pose.yaw >= cfg.yaw[0] &&
+              pose.yaw <= cfg.yaw[1] &&
+              pose.pitch >= cfg.pitch[0] &&
+              pose.pitch <= cfg.pitch[1];
+
+            if (matches) {
+              setFaceStatus("match");
+              if (!holdStartRef.current) holdStartRef.current = now;
+              const pct = Math.min((now - holdStartRef.current) / HOLD_MS, 1);
+              setHoldPct(pct);
+
+              if (pct >= 1) {
+                const shot = webcamRef.current?.getScreenshot();
+                if (shot) {
+                  framesCollected.current.push(shot.split(",")[1]);
+                  setFrameCount(framesCollected.current.length);
+
+                  flashRef.current = true;
+                  setFlash(true);
+
+                  setTimeout(() => {
+                    flashRef.current = false;
+                    setFlash(false);
+                    holdStartRef.current = null;
+                    setHoldPct(0);
+                    setFaceStatus("none");
+
+                    if (framesCollected.current.length >= POSES.length) {
+                      setPhase("form");
+                    } else {
+                      const next = poseIdxRef.current + 1;
+                      poseIdxRef.current = next;
+                      setPoseIndex(next);
+                    }
+                  }, 600);
+                }
+              }
+            } else {
+              setFaceStatus("wrong");
+              holdStartRef.current = null;
+              setHoldPct(0);
+            }
+          } else {
+            setFaceStatus("none");
+            holdStartRef.current = null;
+            setHoldPct(0);
+          }
+        } catch {
+          // detectForVideo can fail if called too rapidly
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(loop);
+    };
+
+    rafRef.current = requestAnimationFrame(loop);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [phase]);
+
+  // Redirect after success
+  useEffect(() => {
+    if (phase !== "success") return;
+    const t = setTimeout(() => navigate("/"), 2000);
+    return () => clearTimeout(t);
+  }, [phase, navigate]);
+
+  const manualCapture = () => {
+    const shot = webcamRef.current?.getScreenshot();
+    if (!shot) return;
+
+    framesCollected.current.push(shot.split(",")[1]);
+    setFrameCount(framesCollected.current.length);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 350);
+
+    if (framesCollected.current.length >= POSES.length) {
+      setTimeout(() => setPhase("form"), 400);
+    } else {
+      const next = poseIdxRef.current + 1;
+      poseIdxRef.current = next;
+      setPoseIndex(next);
+      holdStartRef.current = null;
+      setHoldPct(0);
+      setFaceStatus("none");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError("Please enter your name.");
       return;
     }
-    if (captures.length < 3) {
-      setError("Please capture at least 3 photos.");
-      return;
-    }
-
     setError("");
-    setMessage("");
-    setLoading(true);
+    setPhase("submitting");
     try {
-      // Send raw base64 images as embeddings placeholder
-      // Backend will compute embeddings from these
-      const res = await registerSelf(
+      await registerSelf(
         name.trim(),
-        captures.map((c) => Array.from({ length: 512 }, () => 0)),
+        framesCollected.current,
+        email.trim() || undefined,
       );
-      setMessage(
-        "Registration successful! You can now use the kiosk to check in.",
-      );
-      setCaptures([]);
-      setName("");
+      setPhase("success");
     } catch (err) {
       setError(err.response?.data?.detail || "Registration failed.");
-    } finally {
-      setLoading(false);
+      setPhase("error");
     }
   };
 
+  const restart = () => {
+    framesCollected.current = [];
+    setFrameCount(0);
+    setPoseIndex(0);
+    poseIdxRef.current = 0;
+    holdStartRef.current = null;
+    lastTsRef.current = 0;
+    setHoldPct(0);
+    setFaceStatus("none");
+    setName("");
+    setEmail("");
+    setError("");
+    setFlash(false);
+    setPhase("camera");
+  };
+
+  const borderColor =
+    faceStatus === "match"
+      ? "border-green-500"
+      : faceStatus === "wrong"
+        ? "border-yellow-500/60"
+        : "border-gray-700";
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">
-        Trainee Registration
-      </h1>
-
-      <div className="bg-white rounded-lg shadow p-6 w-full max-w-lg">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Your Unique Name
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g. John Doe"
-        />
-
-        <Webcam
-          ref={webcamRef}
-          audio={false}
-          screenshotFormat="image/jpeg"
-          videoConstraints={{ facingMode: "user", width: 480, height: 360 }}
-          className="rounded-lg border-2 border-gray-300 w-full"
-        />
-
-        <div className="flex items-center justify-between mt-4">
-          <button
-            onClick={capture}
-            className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition"
-          >
-            Capture ({captures.length}/5)
-          </button>
-          {captures.length > 0 && (
-            <button
-              onClick={() => setCaptures([])}
-              className="text-red-600 hover:underline text-sm"
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-6 text-white relative">
+      {/* Top bar */}
+      <div className="absolute top-0 left-0 right-0 flex items-center px-8 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-cyan-500 flex items-center justify-center">
+            <svg
+              className="w-5 h-5 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
             >
-              Clear All
-            </button>
-          )}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+              />
+            </svg>
+          </div>
+          <span className="text-white text-lg font-bold tracking-wide">
+            ScanIn
+          </span>
         </div>
+      </div>
 
-        {captures.length > 0 && (
-          <div className="flex gap-2 mt-3 overflow-x-auto">
-            {captures.map((_, i) => (
+      <h1 className="text-3xl font-bold mb-2 tracking-wide">
+        Register as Trainee
+      </h1>
+      <p className="text-gray-500 text-sm mb-8">
+        Follow the pose instructions to capture your face from different angles
+      </p>
+
+      {/* ---- LOADING ---- */}
+      {phase === "loading" && (
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400">Loading face detection model…</p>
+        </div>
+      )}
+
+      {/* ---- CAMERA ---- */}
+      {phase === "camera" && (
+        <div className="w-full max-w-md flex flex-col items-center gap-5">
+          <div className="relative w-full">
+            <Webcam
+              ref={webcamRef}
+              audio={false}
+              screenshotFormat="image/jpeg"
+              videoConstraints={{
+                facingMode: "user",
+                width: 480,
+                height: 360,
+              }}
+              className={`rounded-xl border-2 ${borderColor} w-full transition-colors duration-200`}
+            />
+            {/* Flash overlay */}
+            {flash && (
+              <div className="absolute inset-0 bg-white/30 rounded-xl pointer-events-none" />
+            )}
+            {/* Hold progress ring */}
+            {faceStatus === "match" && holdPct > 0 && (
+              <div className="absolute bottom-3 right-3">
+                <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="#374151"
+                    strokeWidth="3"
+                  />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="#22c55e"
+                    strokeWidth="3"
+                    strokeDasharray={`${holdPct * 94.25} 94.25`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+            )}
+          </div>
+
+          {/* Pose instruction */}
+          <div className="text-center">
+            <p className="text-xs text-gray-500 mb-1">
+              Step {poseIndex + 1} of {POSES.length}
+            </p>
+            <p className="text-lg font-semibold text-white flex items-center justify-center gap-2">
+              <span className="text-2xl">{POSES[poseIndex].icon}</span>
+              {POSES[poseIndex].label}
+            </p>
+            <p className="text-sm mt-1.5 text-gray-400">
+              {faceStatus === "none"
+                ? "Position your face in front of the camera"
+                : faceStatus === "wrong"
+                  ? "Almost there — adjust your pose"
+                  : "Hold still…"}
+            </p>
+          </div>
+
+          {/* Step dots */}
+          <div className="flex gap-2.5">
+            {POSES.map((_, i) => (
               <div
                 key={i}
-                className="w-16 h-16 bg-green-100 rounded flex items-center justify-center text-green-700 text-xs font-medium"
+                className={`w-3 h-3 rounded-full transition-colors duration-200 ${
+                  i < frameCount
+                    ? "bg-green-500"
+                    : i === poseIndex
+                      ? faceStatus === "match"
+                        ? "bg-green-500 animate-pulse"
+                        : "bg-cyan-500"
+                      : "bg-gray-700"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Manual capture fallback */}
+          <button
+            onClick={manualCapture}
+            className="text-gray-600 hover:text-gray-400 text-xs transition cursor-pointer"
+          >
+            {modelLoaded
+              ? "Pose not detected? Capture manually"
+              : "Auto-detection unavailable — tap to capture"}
+          </button>
+        </div>
+      )}
+
+      {/* ---- FORM ---- */}
+      {phase === "form" && (
+        <div className="w-full max-w-md flex flex-col items-center gap-4">
+          <div className="flex gap-2">
+            {POSES.map((p, i) => (
+              <div
+                key={i}
+                className="w-10 h-10 rounded-full bg-green-900/30 flex items-center justify-center text-green-400 text-sm font-bold border border-green-500/20"
+                title={p.label}
               >
-                #{i + 1}
+                {p.icon}
               </div>
             ))}
           </div>
-        )}
+          <p className="text-green-400 text-sm">
+            {POSES.length} poses captured!
+          </p>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            placeholder="Enter your unique name"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email (optional — for check-in/out notifications)"
+            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-semibold py-3 rounded-lg transition cursor-pointer"
+          >
+            Register
+          </button>
+          <button
+            onClick={restart}
+            className="text-gray-500 hover:text-gray-300 text-sm transition cursor-pointer"
+          >
+            Retake photos
+          </button>
+        </div>
+      )}
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="mt-6 w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2 rounded-lg transition"
-        >
-          {loading ? "Registering..." : "Register"}
-        </button>
+      {/* ---- SUBMITTING ---- */}
+      {phase === "submitting" && (
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400">Registering…</p>
+        </div>
+      )}
 
-        {message && (
-          <p className="mt-3 text-green-600 text-center">{message}</p>
-        )}
-        {error && <p className="mt-3 text-red-600 text-center">{error}</p>}
-      </div>
+      {/* ---- SUCCESS ---- */}
+      {phase === "success" && (
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-4xl">
+            ✓
+          </div>
+          <p className="text-green-400 text-xl font-semibold">
+            Registration successful!
+          </p>
+          <p className="text-gray-500 text-sm">Redirecting to kiosk…</p>
+        </div>
+      )}
 
-      <a href="/" className="mt-6 text-blue-600 hover:underline text-sm">
-        Back to Kiosk
+      {/* ---- ERROR ---- */}
+      {phase === "error" && (
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 text-4xl">
+            ✕
+          </div>
+          <p className="text-red-400 text-lg font-semibold">{error}</p>
+          <button
+            onClick={restart}
+            className="mt-2 bg-gray-800 hover:bg-gray-700 text-white py-2 px-6 rounded-lg transition cursor-pointer"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {/* Footer */}
+      <a
+        href="/"
+        className="mt-8 text-gray-500 hover:text-cyan-400 text-sm transition"
+      >
+        ← Back to Kiosk
       </a>
     </div>
   );

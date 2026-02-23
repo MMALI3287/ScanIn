@@ -18,18 +18,40 @@ export const login = (username, password) =>
 
 // Trainees
 export const getTrainees = () => api.get("/trainees");
-export const registerSelf = (unique_name, embeddings) =>
-  api.post("/trainees/register-self", { unique_name, embeddings });
-export const registerByAdmin = (unique_name, images) =>
-  api.post("/trainees/register-admin", { unique_name, images });
+export const registerSelf = (unique_name, frames, email) => {
+  const body = { unique_name, frames };
+  if (email) body.email = email;
+  return api.post("/trainees/register-self", body);
+};
+export const registerByAdmin = (unique_name, imageFiles, email) => {
+  const form = new FormData();
+  form.append("unique_name", unique_name);
+  if (email) form.append("email", email);
+  imageFiles.forEach((f) => form.append("images", f));
+  return api.post("/trainees/register-admin", form);
+};
 export const deleteTrainee = (id) => api.delete(`/trainees/${id}`);
 
 // Attendance
 export const checkin = (frame) => api.post("/attendance/checkin", { frame });
 export const checkout = (frame) => api.post("/attendance/checkout", { frame });
+
+export const checkIn = (base64Frame) =>
+  axios.post("http://localhost:8000/api/v1/attendance/checkin", {
+    frame: base64Frame,
+  });
+
+export const identifyFace = (base64Frame) =>
+  axios.post("http://localhost:8000/api/v1/attendance/identify", {
+    frame: base64Frame,
+  });
+
 export const getAttendance = (params) => api.get("/attendance", { params });
+export const getMyAttendance = (params) =>
+  api.get("/attendance/my", { params });
 export const patchAttendance = (id, data) =>
   api.patch(`/attendance/${id}`, data);
+export const deleteAttendance = (id) => api.delete(`/attendance/${id}`);
 
 // Reports
 export const exportReport = (format, from, to) =>

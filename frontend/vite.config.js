@@ -10,6 +10,10 @@ export default defineConfig({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      "/captures": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
 });
