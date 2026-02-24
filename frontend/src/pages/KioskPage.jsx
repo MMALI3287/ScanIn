@@ -2,6 +2,38 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Webcam from "react-webcam";
 import { checkIn, identifyFace } from "../services/api";
 
+function playChime(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0.15;
+
+    if (type === "success") {
+      osc.frequency.value = 880;
+      osc.type = "sine";
+      osc.start();
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1);
+      osc.frequency.setValueAtTime(1318.51, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.stop(ctx.currentTime + 0.6);
+    } else {
+      osc.frequency.value = 330;
+      osc.type = "square";
+      osc.start();
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.stop(ctx.currentTime + 0.4);
+    }
+  } catch {
+    // Audio not available
+  }
+}
+
 export default function KioskPage() {
   const webcamRef = useRef(null);
   const [phase, setPhase] = useState("idle");
@@ -10,6 +42,7 @@ export default function KioskPage() {
   const [capturedFrame, setCapturedFrame] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [clock, setClock] = useState(new Date());
+  const [showPulse, setShowPulse] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date()), 1000);
@@ -52,6 +85,7 @@ export default function KioskPage() {
           : "Something went wrong. Try again.");
       setErrorMsg(msg);
       setPhase("error");
+      playChime("error");
       resetFull(2000);
     }
   }, [resetFull]);
@@ -65,10 +99,14 @@ export default function KioskPage() {
       if (res.data.success) {
         setResult(res.data.data);
         setPhase("success");
+        playChime("success");
+        setShowPulse(true);
+        setTimeout(() => setShowPulse(false), 1000);
         resetFull(3000);
       } else {
         setErrorMsg(res.data.message || "Something went wrong. Try again.");
         setPhase("error");
+        playChime("error");
         resetFull(2000);
       }
     } catch (err) {
@@ -79,6 +117,7 @@ export default function KioskPage() {
           : "Something went wrong. Try again.");
       setErrorMsg(msg);
       setPhase("error");
+      playChime("error");
       resetFull(2000);
     }
   }, [capturedFrame, resetFull]);
@@ -105,11 +144,34 @@ export default function KioskPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center select-none relative">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center select-none relative overflow-hidden"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        background:
+          "radial-gradient(ellipse 110% 55% at 50% -5%, rgba(6,182,212,0.14) 0%, transparent 62%), #060a10",
+      }}
+    >
+      {/* Subtle dot-grid texture */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, #fff 1px, transparent 1px)",
+          backgroundSize: "28px 28px",
+        }}
+      />
+
       {/* Top bar */}
-      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-8 py-4">
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-8 py-5 border-b border-white/[0.05]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-cyan-500 flex items-center justify-center">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{
+              background: "linear-gradient(135deg, #22d3ee 0%, #0891b2 100%)",
+              boxShadow: "0 0 16px rgba(6,182,212,0.45)",
+            }}
+          >
             <svg
               className="w-5 h-5 text-white"
               fill="none"
@@ -124,42 +186,100 @@ export default function KioskPage() {
               />
             </svg>
           </div>
-          <span className="text-white text-lg font-bold tracking-wide">
+          <span className="text-white text-lg font-bold tracking-[0.2em] uppercase">
             ScanIn
           </span>
         </div>
         <a
           href="/admin/login"
-          className="text-gray-600 hover:text-gray-400 text-xs transition"
+          className="text-gray-400 hover:text-white text-xs tracking-widest uppercase transition duration-200"
         >
           Admin
         </a>
       </div>
 
       {/* Clock */}
-      <div className="mb-6 text-center">
-        <p className="text-5xl font-bold text-white tracking-tight font-mono tabular-nums">
+      <div className="mb-8 text-center">
+        <p
+          className="tabular-nums text-white"
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: "clamp(2.2rem, 5vh, 4.8rem)",
+            fontWeight: 300,
+            letterSpacing: "-0.03em",
+            textShadow: "0 0 40px rgba(6,182,212,0.25)",
+          }}
+        >
           {timeStr}
         </p>
-        <p className="text-gray-500 mt-1 text-sm">{dateStr}</p>
+        <p className="text-gray-100 mt-2 text-sm font-medium tracking-wide">
+          {dateStr}
+        </p>
       </div>
 
       {/* Camera / Result Area */}
       {phase === "success" ? (
-        /* Success card */
         <div
-          className={`w-[640px] h-[480px] rounded-2xl border ${result?.action === "checkout" ? "border-blue-500/30" : "border-green-500/30"} bg-gray-900 flex flex-col items-center justify-center`}
+          className="rounded-2xl flex flex-col items-center justify-center relative overflow-hidden"
+          style={{
+            width: "clamp(32.5em, 33vw, 48.75em)",
+            height: "clamp(24.375em, 24.75vw, 36.5em)",
+            background: "rgba(10,16,26,0.95)",
+            border:
+              result?.action === "checkout"
+                ? "1px solid rgba(59,130,246,0.35)"
+                : "1px solid rgba(34,197,94,0.35)",
+            boxShadow:
+              result?.action === "checkout"
+                ? "0 0 60px rgba(59,130,246,0.08), inset 0 0 40px rgba(59,130,246,0.04)"
+                : "0 0 60px rgba(34,197,94,0.08), inset 0 0 40px rgba(34,197,94,0.04)",
+          }}
         >
+          {/* Pulse animation */}
+          {showPulse && (
+            <div
+              className="absolute inset-0 rounded-2xl animate-ping pointer-events-none"
+              style={{
+                background: result?.action === "checkout" ? "rgba(59,130,246,0.1)" : "rgba(34,197,94,0.1)",
+                animationDuration: "0.8s",
+                animationIterationCount: 1,
+              }}
+            />
+          )}
+          {/* Captured photo */}
+          {capturedFrame && (
+            <div className="mb-4">
+              <img
+                src={`data:image/jpeg;base64,${capturedFrame}`}
+                alt="Captured"
+                className="w-20 h-20 rounded-full object-cover border-2"
+                style={{
+                  borderColor: result?.action === "checkout" ? "rgba(59,130,246,0.5)" : "rgba(34,197,94,0.5)",
+                  boxShadow: result?.action === "checkout" ? "0 0 20px rgba(59,130,246,0.3)" : "0 0 20px rgba(34,197,94,0.3)",
+                }}
+              />
+            </div>
+          )}
           <div
-            className={`w-24 h-24 rounded-full ${result?.action === "checkout" ? "bg-blue-500/20" : "bg-green-500/20"} flex items-center justify-center mb-6`}
+            className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+            style={{
+              background:
+                result?.action === "checkout"
+                  ? "rgba(59,130,246,0.15)"
+                  : "rgba(34,197,94,0.15)",
+              boxShadow:
+                result?.action === "checkout"
+                  ? "0 0 40px rgba(59,130,246,0.25)"
+                  : "0 0 40px rgba(34,197,94,0.25)",
+            }}
           >
             {result?.action === "checkout" ? (
               <svg
-                className="w-14 h-14 text-blue-400"
+                className="w-7 h-7 text-blue-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2.5}
+                strokeWidth={2}
               >
                 <path
                   strokeLinecap="round"
@@ -169,11 +289,11 @@ export default function KioskPage() {
               </svg>
             ) : (
               <svg
-                className="w-14 h-14 text-green-400"
+                className="w-7 h-7 text-green-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                strokeWidth={2.5}
+                strokeWidth={2}
               >
                 <path
                   strokeLinecap="round"
@@ -183,15 +303,27 @@ export default function KioskPage() {
               </svg>
             )}
           </div>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-3xl font-bold text-white tracking-tight">
             {result?.trainee_name}
           </p>
-          <p className="text-gray-400 mt-2 text-lg">
+          <p className="text-gray-200 mt-2 text-base">
             {result?.action === "checkout" ? "Checked out" : "Checked in"} at{" "}
-            {result?.time}
+            <span className="text-gray-200 font-semibold">{result?.time}</span>
           </p>
           <span
-            className={`mt-4 px-4 py-1.5 rounded-full text-sm font-medium ${result?.action === "checkout" ? "bg-blue-500/20 text-blue-400" : "bg-green-500/20 text-green-400"}`}
+            className="mt-5 px-5 py-1.5 rounded-full text-sm font-semibold tracking-wide"
+            style={{
+              background:
+                result?.action === "checkout"
+                  ? "rgba(59,130,246,0.15)"
+                  : "rgba(34,197,94,0.15)",
+              color:
+                result?.action === "checkout" ? "#93c5fd" : "#86efac",
+              border:
+                result?.action === "checkout"
+                  ? "1px solid rgba(59,130,246,0.3)"
+                  : "1px solid rgba(34,197,94,0.3)",
+            }}
           >
             {result?.action === "checkout"
               ? "Check-out Successful"
@@ -199,52 +331,103 @@ export default function KioskPage() {
           </span>
         </div>
       ) : phase === "confirm" || phase === "recording" ? (
-        /* Confirmation card */
         <div
-          className={`w-[640px] h-[480px] rounded-2xl border ${identified?.action === "checkout" ? "border-blue-500/30" : "border-cyan-500/30"} bg-gray-900 flex flex-col items-center justify-center`}
+          className="rounded-2xl flex flex-col items-center justify-center"
+          style={{
+            width: "clamp(32.5em, 33vw, 48.75em)",
+            height: "clamp(24.375em, 24.75vw, 36.5em)",
+            background: "rgba(10,16,26,0.95)",
+            border:
+              identified?.action === "checkout"
+                ? "1px solid rgba(59,130,246,0.35)"
+                : "1px solid rgba(6,182,212,0.35)",
+            boxShadow:
+              identified?.action === "checkout"
+                ? "0 0 60px rgba(59,130,246,0.08)"
+                : "0 0 60px rgba(6,182,212,0.08)",
+          }}
         >
-          <div
-            className={`w-20 h-20 rounded-full ${identified?.action === "checkout" ? "bg-blue-500/20" : "bg-cyan-500/20"} flex items-center justify-center mb-5`}
-          >
-            <svg
-              className={`w-10 h-10 ${identified?.action === "checkout" ? "text-blue-400" : "text-cyan-400"}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+          {/* Captured photo as avatar */}
+          {capturedFrame ? (
+            <div className="mb-5">
+              <img
+                src={`data:image/jpeg;base64,${capturedFrame}`}
+                alt="You"
+                className="w-20 h-20 rounded-full object-cover border-2"
+                style={{
+                  borderColor: identified?.action === "checkout" ? "rgba(59,130,246,0.4)" : "rgba(6,182,212,0.4)",
+                  boxShadow: identified?.action === "checkout" ? "0 0 24px rgba(59,130,246,0.2)" : "0 0 24px rgba(6,182,212,0.2)",
+                }}
               />
-            </svg>
-          </div>
-          <p className="text-2xl font-bold text-white mb-1">
+            </div>
+          ) : (
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
+              style={{
+                background:
+                  identified?.action === "checkout"
+                    ? "rgba(59,130,246,0.12)"
+                    : "rgba(6,182,212,0.12)",
+                boxShadow:
+                  identified?.action === "checkout"
+                    ? "0 0 32px rgba(59,130,246,0.2)"
+                    : "0 0 32px rgba(6,182,212,0.2)",
+              }}
+            >
+              <svg
+                className={`w-10 h-10 ${identified?.action === "checkout" ? "text-blue-400" : "text-cyan-400"}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.75}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                />
+              </svg>
+            </div>
+          )}
+          <p className="text-2xl font-bold text-white tracking-tight mb-1">
             {identified?.trainee_name}
           </p>
-          <p className="text-gray-400 text-sm mb-8">
+          <p className="text-gray-200 text-sm font-medium mb-10 tracking-wide">
             {identified?.action === "checkout"
               ? "You are about to check out"
               : "You are about to check in"}
           </p>
 
           {phase === "recording" ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-10 h-10 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-              <p className="text-cyan-400 text-sm animate-pulse">
-                Recording...
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: "rgba(6,182,212,0.2)", borderTopColor: "transparent" }}
+              >
+                <div className="w-full h-full rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+              </div>
+              <p className="text-cyan-400 text-sm font-medium tracking-widest uppercase animate-pulse">
+                Recording…
               </p>
             </div>
           ) : (
             <div className="flex gap-4">
               <button
                 onClick={handleConfirm}
-                className={`font-bold text-lg py-3 px-10 rounded-xl transition-all duration-200 active:scale-95 cursor-pointer ${
+                className="font-semibold text-base py-3.5 px-10 rounded-xl transition-all duration-200 active:scale-95 cursor-pointer tracking-wide"
+                style={
                   identified?.action === "checkout"
-                    ? "bg-blue-500 hover:bg-blue-400 text-white"
-                    : "bg-green-500 hover:bg-green-400 text-white"
-                }`}
+                    ? {
+                        background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                        color: "#fff",
+                        boxShadow: "0 4px 20px rgba(59,130,246,0.4)",
+                      }
+                    : {
+                        background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                        color: "#fff",
+                        boxShadow: "0 4px 20px rgba(34,197,94,0.4)",
+                      }
+                }
               >
                 {identified?.action === "checkout"
                   ? "Confirm Check-out"
@@ -252,7 +435,20 @@ export default function KioskPage() {
               </button>
               <button
                 onClick={handleCancel}
-                className="bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-lg py-3 px-8 rounded-xl transition-all duration-200 cursor-pointer"
+                className="font-semibold text-base py-3.5 px-8 rounded-xl transition-all duration-200 cursor-pointer tracking-wide"
+                style={{
+                  background: "rgba(255,255,255,0.07)",
+                  color: "#e2e8f0",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+                  e.currentTarget.style.color = "#f8fafc";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+                  e.currentTarget.style.color = "#e2e8f0";
+                }}
               >
                 Not Me
               </button>
@@ -260,52 +456,73 @@ export default function KioskPage() {
           )}
         </div>
       ) : (
-        <div className="relative">
+        <div
+          className="relative"
+          style={{ width: "clamp(32.5em, 33vw, 48.75em)" }}
+        >
           <Webcam
             ref={webcamRef}
             audio={false}
             screenshotFormat="image/jpeg"
-            videoConstraints={{ facingMode: "user", width: 640, height: 480 }}
-            className="rounded-2xl border border-gray-800 w-[640px] h-[480px] object-cover"
+            videoConstraints={{ facingMode: "user", width: 1280, height: 960 }}
+            className="rounded-2xl w-full object-cover"
+            style={{
+              aspectRatio: "4/3",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 0 0 1px rgba(6,182,212,0.08), 0 24px 60px rgba(0,0,0,0.5)",
+            }}
           />
 
-          {/* Corner brackets overlay */}
-          <div className="absolute inset-12 pointer-events-none">
-            <div className="absolute top-0 left-0 w-10 h-10 border-t-3 border-l-3 border-cyan-400 rounded-tl-lg" />
-            <div className="absolute top-0 right-0 w-10 h-10 border-t-3 border-r-3 border-cyan-400 rounded-tr-lg" />
-            <div className="absolute bottom-0 left-0 w-10 h-10 border-b-3 border-l-3 border-cyan-400 rounded-bl-lg" />
-            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-3 border-r-3 border-cyan-400 rounded-br-lg" />
-          </div>
+          {/* Corner bracket overlays */}
+          {["top-0 left-0 border-t-2 border-l-2 rounded-tl-lg", "top-0 right-0 border-t-2 border-r-2 rounded-tr-lg", "bottom-0 left-0 border-b-2 border-l-2 rounded-bl-lg", "bottom-0 right-0 border-b-2 border-r-2 rounded-br-lg"].map(
+            (cls, i) => (
+              <div
+                key={i}
+                className={`absolute w-9 h-9 pointer-events-none ${cls}`}
+                style={{
+                  margin: "3rem",
+                  borderColor: "#22d3ee",
+                  filter: "drop-shadow(0 0 4px rgba(6,182,212,0.7))",
+                }}
+              />
+            )
+          )}
 
           {/* Scanning overlay */}
           {phase === "scanning" && (
-            <div className="absolute inset-0 bg-black/60 rounded-2xl flex flex-col items-center justify-center">
-              <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-              <p className="text-cyan-400 text-lg font-semibold mt-4 animate-pulse">
-                Scanning...
+            <div className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center" style={{ background: "rgba(6,10,16,0.72)", backdropFilter: "blur(2px)" }}>
+              <div
+                className="w-16 h-16 rounded-full border-2 border-t-transparent animate-spin mb-5"
+                style={{ borderColor: "rgba(6,182,212,0.3)", borderTopColor: "#22d3ee", boxShadow: "0 0 20px rgba(6,182,212,0.3)" }}
+              />
+              <p className="text-cyan-400 text-base font-semibold tracking-widest uppercase animate-pulse">
+                Scanning…
               </p>
             </div>
           )}
 
           {/* Error overlay */}
           {phase === "error" && (
-            <div className="absolute inset-0 bg-black/70 rounded-2xl flex flex-col items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-2xl flex flex-col items-center justify-center" style={{ background: "rgba(6,10,16,0.75)", backdropFilter: "blur(2px)" }}>
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
+                style={{
+                  background: "rgba(239,68,68,0.12)",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  boxShadow: "0 0 32px rgba(239,68,68,0.2)",
+                }}
+              >
                 <svg
-                  className="w-10 h-10 text-red-500"
+                  className="w-10 h-10 text-red-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                   strokeWidth={2.5}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <p className="text-red-400 text-lg font-semibold mt-4">
+              <p className="text-red-300 text-base font-semibold tracking-wide text-center max-w-xs">
                 {errorMsg || "Face not recognized. Try again."}
               </p>
             </div>
@@ -315,36 +532,43 @@ export default function KioskPage() {
 
       {/* Scan button + hint */}
       <div className="mt-8 flex flex-col items-center gap-3">
-        {phase !== "confirm" &&
-          phase !== "recording" &&
-          phase !== "success" && (
-            <>
-              <button
-                onClick={handleScan}
-                disabled={phase !== "idle"}
-                className="bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-700 disabled:text-gray-500 text-gray-950 font-bold text-lg py-3 px-14 rounded-xl transition-all duration-200 active:scale-95 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {phase === "scanning" ? "Scanning..." : "Scan Face"}
-              </button>
-              <p className="text-gray-600 text-xs">
-                Look straight at the camera and stay still
-              </p>
-            </>
-          )}
+        {phase !== "confirm" && phase !== "recording" && phase !== "success" && (
+          <>
+            <button
+              onClick={handleScan}
+              disabled={phase !== "idle"}
+              className="font-semibold text-base py-4 px-16 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer disabled:cursor-not-allowed tracking-wider"
+              style={
+                phase !== "idle"
+                  ? { background: "rgba(255,255,255,0.06)", color: "#4b5563", border: "1px solid rgba(255,255,255,0.06)" }
+                  : {
+                      background: "linear-gradient(135deg, #22d3ee 0%, #0891b2 100%)",
+                      color: "#fff",
+                      boxShadow: "0 4px 24px rgba(6,182,212,0.45), 0 0 0 1px rgba(6,182,212,0.2)",
+                    }
+              }
+            >
+              {phase === "scanning" ? "Scanning…" : "Scan Face"}
+            </button>
+            <p className="text-gray-300 text-sm tracking-wide">
+              Look straight at the camera and stay still
+            </p>
+          </>
+        )}
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-6 flex items-center gap-4">
+      <div className="absolute bottom-6 flex items-center gap-5">
         <a
           href="/register"
-          className="text-gray-600 hover:text-cyan-400 text-xs transition"
+          className="text-gray-300 hover:text-cyan-300 text-sm tracking-wide transition duration-200"
         >
           New here? Register as a trainee
         </a>
-        <span className="text-gray-700">|</span>
+        <span className="text-gray-500">•</span>
         <a
           href="/history"
-          className="text-gray-600 hover:text-cyan-400 text-xs transition"
+          className="text-gray-300 hover:text-cyan-300 text-sm tracking-wide transition duration-200"
         >
           View my attendance
         </a>

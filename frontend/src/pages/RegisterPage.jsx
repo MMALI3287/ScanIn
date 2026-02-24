@@ -4,55 +4,80 @@ import { useNavigate } from "react-router-dom";
 import { registerSelf } from "../services/api";
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
+// All angles are in degrees from the facial transformation matrix.
+// Positive yaw = face turning to the camera-left (user's right).
+// Positive pitch = face tilting downward.
 const POSES = [
   {
     label: "Look straight at the camera",
     icon: "●",
-    yaw: [-0.15, 0.15],
-    pitch: [0.35, 0.72],
+    yaw: [-13, 13],
+    pitch: [-13, 13],
   },
   {
     label: "Turn your head slightly left",
     icon: "←",
-    yaw: [0.12, Infinity],
-    pitch: [0.2, 0.85],
+    yaw: [20, Infinity],
+    pitch: [-20, 20],
   },
   {
     label: "Turn your head slightly right",
     icon: "→",
-    yaw: [-Infinity, -0.12],
-    pitch: [0.2, 0.85],
+    yaw: [-Infinity, -20],
+    pitch: [-20, 20],
   },
   {
     label: "Tilt your head slightly up",
     icon: "↑",
-    yaw: [-0.22, 0.22],
-    pitch: [-Infinity, 0.43],
+    yaw: [-15, 15],
+    pitch: [-Infinity, -18],
   },
   {
-    label: "Tilt your head slightly down",
-    icon: "↓",
-    yaw: [-0.22, 0.22],
-    pitch: [0.63, Infinity],
+    label: "Look straight at the camera again",
+    icon: "●",
+    yaw: [-13, 13],
+    pitch: [-13, 13],
   },
 ];
 
 const HOLD_MS = 1000;
 
-function computePose(landmarks) {
-  const nose = landmarks[1];
+// Reject detection when the face geometry looks like a hand or occluded region.
+function isValidFace(landmarks) {
   const lEye = landmarks[33];
   const rEye = landmarks[263];
   const chin = landmarks[152];
+  const mouth = landmarks[13]; // upper inner lip
 
-  const ecX = (lEye.x + rEye.x) / 2;
-  const ew = Math.abs(rEye.x - lEye.x) || 0.001;
   const ecY = (lEye.y + rEye.y) / 2;
-  const fh = Math.abs(chin.y - ecY) || 0.001;
+  const ew = Math.abs(rEye.x - lEye.x);
 
+  // Eyes must be clearly apart — rejects hands/objects
+  if (ew < 0.07) return false;
+  // Chin must be well below the eyes
+  if (chin.y < ecY + 0.12) return false;
+  // Mouth must be between eyes and chin, not above eyes (rejects upside-down)
+  if (mouth.y < ecY) return false;
+
+  return true;
+}
+
+// Extract yaw & pitch in degrees from MediaPipe's row-major 4×4 transformation matrix.
+// MediaPipe stores the matrix row-by-row (proto repeated float).
+// Column 2 of the rotation block = where the face's forward (+Z canonical) axis points
+// in camera space: (m[2], m[6], m[10]).
+//   fwdX > 0  →  face turns to camera-right  →  user turns LEFT  (mirrored)
+//   fwdX < 0  →  user turns RIGHT
+//   fwdY < 0  →  face tilts up  (camera Y is downward)
+function computePoseFromMatrix(matrixData) {
+  const m = matrixData;
+  const DEG = 180 / Math.PI;
+  const fwdX = m[2];   // camera-right component of face-forward
+  const fwdY = m[6];   // camera-down  component of face-forward
+  const fwdZ = m[10];  // camera-depth component of face-forward (≈1 when face-on)
   return {
-    yaw: (nose.x - ecX) / ew,
-    pitch: (nose.y - ecY) / fh,
+    yaw:   Math.atan2(fwdX, fwdZ) * DEG,  // + = user turns left, − = user turns right
+    pitch: Math.atan2(fwdY, fwdZ) * DEG,  // + = tilt down,       − = tilt up
   };
 }
 
@@ -96,6 +121,7 @@ export default function RegisterPage() {
           },
           runningMode: "VIDEO",
           numFaces: 1,
+          outputFacialTransformationMatrixes: true,
         });
         if (cancelled) return;
         landmarkerRef.current = lm;
@@ -140,7 +166,20 @@ export default function RegisterPage() {
           const result = lm.detectForVideo(video, now);
 
           if (result.faceLandmarks?.length > 0) {
-            const pose = computePose(result.faceLandmarks[0]);
+            const landmarks = result.faceLandmarks[0];
+            if (!isValidFace(landmarks)) {
+              setFaceStatus("none");
+              holdStartRef.current = null;
+              setHoldPct(0);
+              rafRef.current = requestAnimationFrame(loop);
+              return;
+            }
+            const matrixResult = result.facialTransformationMatrixes;
+            if (!matrixResult?.length) {
+              rafRef.current = requestAnimationFrame(loop);
+              return;
+            }
+            const pose = computePoseFromMatrix(matrixResult[0].data);
             const cfg = POSES[poseIdxRef.current];
             const matches =
               pose.yaw >= cfg.yaw[0] &&
@@ -304,7 +343,7 @@ export default function RegisterPage() {
       <h1 className="text-3xl font-bold mb-2 tracking-wide">
         Register as Trainee
       </h1>
-      <p className="text-gray-500 text-sm mb-8">
+      <p className="text-gray-300 text-sm mb-8">
         Follow the pose instructions to capture your face from different angles
       </p>
 
@@ -312,7 +351,7 @@ export default function RegisterPage() {
       {phase === "loading" && (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Loading face detection model…</p>
+          <p className="text-gray-100">Loading face detection model…</p>
         </div>
       )}
 
@@ -364,14 +403,14 @@ export default function RegisterPage() {
 
           {/* Pose instruction */}
           <div className="text-center">
-            <p className="text-xs text-gray-500 mb-1">
+            <p className="text-xs text-gray-300 mb-1">
               Step {poseIndex + 1} of {POSES.length}
             </p>
             <p className="text-lg font-semibold text-white flex items-center justify-center gap-2">
               <span className="text-2xl">{POSES[poseIndex].icon}</span>
               {POSES[poseIndex].label}
             </p>
-            <p className="text-sm mt-1.5 text-gray-400">
+            <p className="text-sm mt-1.5 text-gray-100">
               {faceStatus === "none"
                 ? "Position your face in front of the camera"
                 : faceStatus === "wrong"
@@ -401,7 +440,7 @@ export default function RegisterPage() {
           {/* Manual capture fallback */}
           <button
             onClick={manualCapture}
-            className="text-gray-600 hover:text-gray-400 text-xs transition cursor-pointer"
+            className="text-gray-400 hover:text-gray-100 text-xs transition cursor-pointer"
           >
             {modelLoaded
               ? "Pose not detected? Capture manually"
@@ -451,7 +490,7 @@ export default function RegisterPage() {
           </button>
           <button
             onClick={restart}
-            className="text-gray-500 hover:text-gray-300 text-sm transition cursor-pointer"
+            className="text-gray-300 hover:text-white text-sm transition cursor-pointer"
           >
             Retake photos
           </button>
@@ -462,7 +501,7 @@ export default function RegisterPage() {
       {phase === "submitting" && (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Registering…</p>
+          <p className="text-gray-100">Registering…</p>
         </div>
       )}
 
@@ -475,7 +514,7 @@ export default function RegisterPage() {
           <p className="text-green-400 text-xl font-semibold">
             Registration successful!
           </p>
-          <p className="text-gray-500 text-sm">Redirecting to kiosk…</p>
+          <p className="text-gray-200 text-sm">Redirecting to kiosk…</p>
         </div>
       )}
 
@@ -498,7 +537,7 @@ export default function RegisterPage() {
       {/* Footer */}
       <a
         href="/"
-        className="mt-8 text-gray-500 hover:text-cyan-400 text-sm transition"
+        className="mt-8 text-gray-300 hover:text-cyan-300 text-sm transition"
       >
         ← Back to Kiosk
       </a>

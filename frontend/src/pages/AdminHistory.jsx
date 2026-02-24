@@ -7,6 +7,9 @@ import {
   deleteAttendance,
 } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
+import { useDarkMode } from "../DarkModeContext";
+
+const PAGE_SIZE = 15;
 
 function toLocalInput(isoStr) {
   if (!isoStr) return "";
@@ -16,6 +19,7 @@ function toLocalInput(isoStr) {
 }
 
 export default function AdminHistory() {
+  const { dark } = useDarkMode();
   const navigate = useNavigate();
 
   const [trainees, setTrainees] = useState([]);
@@ -29,6 +33,7 @@ export default function AdminHistory() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     getTrainees()
@@ -38,6 +43,7 @@ export default function AdminHistory() {
 
   const fetchHistory = async () => {
     setLoading(true);
+    setPage(1);
     try {
       const params = {};
       if (traineeId) params.trainee_id = traineeId;
@@ -118,13 +124,13 @@ export default function AdminHistory() {
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+                <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
                   Trainee
                 </label>
                 <select
                   value={traineeId}
                   onChange={(e) => setTraineeId(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className={`${dark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                 >
                   <option value="">All trainees</option>
                   {trainees.map((t) => (
@@ -135,25 +141,25 @@ export default function AdminHistory() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+                <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
                   From
                 </label>
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className={`${dark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">
+                <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
                   To
                 </label>
                 <input
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className={`${dark ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500`}
                 />
               </div>
               <button
@@ -189,10 +195,11 @@ export default function AdminHistory() {
                 </p>
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse bg-gray-900 rounded-lg overflow-hidden">
+                <table className={`w-full border-collapse ${dark ? "bg-gray-900" : "bg-white"} rounded-lg overflow-hidden`}>
                   <thead>
-                    <tr className="bg-gray-800 text-left text-sm font-semibold text-gray-400">
+                    <tr className={`${dark ? "bg-gray-800" : "bg-gray-50"} text-left text-sm font-semibold ${dark ? "text-gray-400" : "text-gray-500"}`}>
                       <th className="p-3">Name</th>
                       <th className="p-3">Date</th>
                       <th className="p-3">Check-in</th>
@@ -203,16 +210,16 @@ export default function AdminHistory() {
                     </tr>
                   </thead>
                   <tbody>
-                    {records.map((r) =>
+                    {records.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((r) =>
                       editingId === r.id ? (
                         <tr
                           key={r.id}
-                          className="border-t border-gray-800 bg-gray-800/50"
+                          className={`${dark ? "border-t border-gray-800 bg-gray-800/50" : "border-t border-gray-200 bg-gray-50"}`}
                         >
-                          <td className="p-3 font-medium text-white">
+                          <td className={`p-3 font-medium ${dark ? "text-white" : "text-gray-900"}`}>
                             {r.trainee_name}
                           </td>
-                          <td className="p-3 text-gray-300">{r.date}</td>
+                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>{r.date}</td>
                           <td className="p-3">
                             <input
                               type="datetime-local"
@@ -223,7 +230,7 @@ export default function AdminHistory() {
                                   checkin_time: e.target.value,
                                 })
                               }
-                              className="bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                              className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                             />
                           </td>
                           <td className="p-3">
@@ -236,7 +243,7 @@ export default function AdminHistory() {
                                   checkout_time: e.target.value,
                                 })
                               }
-                              className="bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                              className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                             />
                           </td>
                           <td className="p-3">
@@ -248,7 +255,7 @@ export default function AdminHistory() {
                                   status: e.target.value,
                                 })
                               }
-                              className="bg-gray-700 border border-gray-600 text-white rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                              className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                             >
                               <option value="present">present</option>
                               <option value="late">late</option>
@@ -259,25 +266,21 @@ export default function AdminHistory() {
                             <div className="flex gap-1">
                               {r.checkin_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkin_image}`}
+                                  src={r.checkin_image}
                                   alt="Check-in"
                                   className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkin_image}`,
-                                    )
+                                    setPreviewImage(r.checkin_image)
                                   }
                                 />
                               )}
                               {r.checkout_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkout_image}`}
+                                  src={r.checkout_image}
                                   alt="Check-out"
                                   className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkout_image}`,
-                                    )
+                                    setPreviewImage(r.checkout_image)
                                   }
                                 />
                               )}
@@ -333,18 +336,18 @@ export default function AdminHistory() {
                       ) : (
                         <tr
                           key={r.id}
-                          className="border-t border-gray-800 hover:bg-gray-800/50"
+                          className={`${dark ? "border-t border-gray-800 hover:bg-gray-800/50" : "border-t border-gray-100 hover:bg-gray-50"}`}
                         >
-                          <td className="p-3 font-medium text-white">
+                          <td className={`p-3 font-medium ${dark ? "text-white" : "text-gray-900"}`}>
                             {r.trainee_name}
                           </td>
-                          <td className="p-3 text-gray-300">{r.date}</td>
-                          <td className="p-3 text-gray-300">
+                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>{r.date}</td>
+                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>
                             {r.checkin_time
                               ? new Date(r.checkin_time).toLocaleTimeString()
                               : "—"}
                           </td>
-                          <td className="p-3 text-gray-300">
+                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>
                             {r.checkout_time
                               ? new Date(r.checkout_time).toLocaleTimeString()
                               : "—"}
@@ -354,27 +357,23 @@ export default function AdminHistory() {
                             <div className="flex gap-1">
                               {r.checkin_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkin_image}`}
+                                  src={r.checkin_image}
                                   alt="Check-in"
-                                  className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500 transition"
+                                  className={`w-8 h-8 rounded object-cover cursor-pointer border ${dark ? "border-gray-600" : "border-gray-300"} hover:border-cyan-500 transition`}
                                   title="Check-in capture"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkin_image}`,
-                                    )
+                                    setPreviewImage(r.checkin_image)
                                   }
                                 />
                               )}
                               {r.checkout_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkout_image}`}
+                                  src={r.checkout_image}
                                   alt="Check-out"
-                                  className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500 transition"
+                                  className={`w-8 h-8 rounded object-cover cursor-pointer border ${dark ? "border-gray-600" : "border-gray-300"} hover:border-cyan-500 transition`}
                                   title="Check-out capture"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkout_image}`,
-                                    )
+                                    setPreviewImage(r.checkout_image)
                                   }
                                 />
                               )}
@@ -437,11 +436,50 @@ export default function AdminHistory() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {records.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between mt-4 px-1">
+                  <p className={`text-sm ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                    Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, records.length)} of {records.length}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(records.length / PAGE_SIZE) }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === Math.ceil(records.length / PAGE_SIZE) || Math.abs(p - page) <= 1)
+                      .map((p, idx, arr) => (
+                        <span key={p} className="flex items-center">
+                          {idx > 0 && arr[idx - 1] !== p - 1 && <span className={`px-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>…</span>}
+                          <button
+                            onClick={() => setPage(p)}
+                            className={`w-8 h-8 rounded-lg text-sm font-medium transition cursor-pointer ${p === page ? "bg-cyan-600 text-white" : dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                          >
+                            {p}
+                          </button>
+                        </span>
+                      ))}
+                    <button
+                      onClick={() => setPage((p) => Math.min(Math.ceil(records.length / PAGE_SIZE), p + 1))}
+                      disabled={page >= Math.ceil(records.length / PAGE_SIZE)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
             {/* Confirm Delete Modal */}
             {confirmDelete && (
               <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-sm shadow-lg text-center">
+                <div className={`${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"} border rounded-xl p-6 w-full max-w-sm shadow-lg text-center`}>
                   <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
                     <svg
                       className="w-6 h-6 text-red-400"
@@ -457,16 +495,16 @@ export default function AdminHistory() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">
+                  <h3 className={`text-lg font-semibold ${dark ? "text-white" : "text-gray-900"} mb-2`}>
                     Delete Attendance Record
                   </h3>
-                  <p className="text-gray-400 text-sm mb-6">
+                  <p className={`${dark ? "text-gray-400" : "text-gray-500"} text-sm mb-6`}>
                     Delete the record for{" "}
-                    <span className="text-white font-medium">
+                    <span className={`${dark ? "text-white" : "text-gray-900"} font-medium`}>
                       "{confirmDelete.name}"
                     </span>{" "}
                     on{" "}
-                    <span className="text-white font-medium">
+                    <span className={`${dark ? "text-white" : "text-gray-900"} font-medium`}>
                       {confirmDelete.date}
                     </span>
                     ?
@@ -497,7 +535,7 @@ export default function AdminHistory() {
                     </button>
                     <button
                       onClick={() => setConfirmDelete(null)}
-                      className="bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 px-5 rounded-lg transition cursor-pointer"
+                      className={`${dark ? "bg-gray-800 hover:bg-gray-700 text-gray-300" : "bg-gray-100 hover:bg-gray-200 text-gray-600"} py-2 px-5 rounded-lg transition cursor-pointer`}
                     >
                       Cancel
                     </button>
