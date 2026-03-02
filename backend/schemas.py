@@ -66,6 +66,11 @@ class AttendancePatch(BaseModel):
 
 
 # Settings
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class SettingUpdate(BaseModel):
     key: str
     value: str

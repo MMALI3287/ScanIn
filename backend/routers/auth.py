@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 
 from database import get_db
 from models import Admin
-from schemas import LoginRequest, APIResponse
+from schemas import LoginRequest, APIResponse, ChangePasswordRequest
+from dependencies import get_current_admin
 
 load_dotenv()
 
@@ -30,3 +31,21 @@ async def login(body: LoginRequest, db: Session = Depends(get_db)):
     token = jwt.encode({"sub": admin.username, "exp": expire}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
     return APIResponse(success=True, data={"token": token}, message="Login successful")
+
+
+@router.patch("/password", response_model=APIResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current: dict = Depends(get_current_admin),
+):
+    admin = db.query(Admin).filter(Admin.username == current["username"]).first()
+    if not admin or not pwd_context.verify(body.current_password, admin.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    admin.password_hash = pwd_context.hash(body.new_password)
+    db.commit()
+    return APIResponse(success=True, message="Password changed successfully")

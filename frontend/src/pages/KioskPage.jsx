@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Webcam from "react-webcam";
-import { checkIn, identifyFace } from "../services/api";
+import { checkin, identifyFace } from "../services/api";
 
 export default function KioskPage() {
   const webcamRef = useRef(null);
@@ -61,7 +61,7 @@ export default function KioskPage() {
     setPhase("recording");
 
     try {
-      const res = await checkIn(capturedFrame);
+      const res = await checkin(capturedFrame);
       if (res.data.success) {
         setResult(res.data.data);
         setPhase("success");

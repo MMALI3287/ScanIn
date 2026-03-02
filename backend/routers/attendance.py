@@ -152,7 +152,9 @@ async def checkin(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
 
 @router.post("/checkout", response_model=APIResponse)
 async def checkout(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
-    # TODO: Add liveness check here before embedding extraction
+    is_live = await check_liveness(body.frame)
+    if not is_live:
+        raise HTTPException(status_code=400, detail="Liveness check failed. Please look at the camera naturally.")
 
     try:
         new_embedding = await get_embedding(body.frame)
@@ -216,13 +218,18 @@ async def get_attendance(
 
     records = query.order_by(Attendance.date.desc(), Attendance.checkin_time.desc()).all()
 
+    trainee_ids = {r.trainee_id for r in records}
+    trainee_map = {
+        t.id: t.unique_name
+        for t in db.query(Trainee).filter(Trainee.id.in_(trainee_ids)).all()
+    }
+
     data = []
     for r in records:
-        t = db.query(Trainee).filter(Trainee.id == r.trainee_id).first()
         item = AttendanceOut(
             id=r.id,
             trainee_id=r.trainee_id,
-            trainee_name=t.unique_name if t else "Unknown",
+            trainee_name=trainee_map.get(r.trainee_id, "Unknown"),
             date=r.date,
             checkin_time=r.checkin_time,
             checkout_time=r.checkout_time,

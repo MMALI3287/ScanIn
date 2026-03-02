@@ -1,8 +1,17 @@
 import axios from "axios";
 
+const API_BASE = import.meta.env.VITE_API_URL || "/api/v1";
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: API_BASE,
 });
+
+export const imageUrl = (path) => {
+  if (!path) return null;
+  if (!import.meta.env.VITE_API_URL) return path;
+  const serverBase = import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, "");
+  return `${serverBase}${path}`;
+};
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("attendance_token");
@@ -15,6 +24,8 @@ api.interceptors.request.use((config) => {
 // Auth
 export const login = (username, password) =>
   api.post("/auth/login", { username, password });
+export const changePassword = (current_password, new_password) =>
+  api.patch("/auth/password", { current_password, new_password });
 
 // Trainees
 export const getTrainees = () => api.get("/trainees");
@@ -35,16 +46,8 @@ export const deleteTrainee = (id) => api.delete(`/trainees/${id}`);
 // Attendance
 export const checkin = (frame) => api.post("/attendance/checkin", { frame });
 export const checkout = (frame) => api.post("/attendance/checkout", { frame });
-
-export const checkIn = (base64Frame) =>
-  axios.post("http://localhost:8000/api/v1/attendance/checkin", {
-    frame: base64Frame,
-  });
-
-export const identifyFace = (base64Frame) =>
-  axios.post("http://localhost:8000/api/v1/attendance/identify", {
-    frame: base64Frame,
-  });
+export const identifyFace = (frame) =>
+  api.post("/attendance/identify", { frame });
 
 export const getAttendance = (params) => api.get("/attendance", { params });
 export const getMyAttendance = (params) =>

@@ -19,12 +19,17 @@ def get_attendance_data(db: Session, from_date: date, to_date: date) -> list[dic
         .all()
     )
 
+    trainee_ids = {r.trainee_id for r in records}
+    trainee_map = {
+        t.id: t.unique_name
+        for t in db.query(Trainee).filter(Trainee.id.in_(trainee_ids)).all()
+    }
+
     rows = []
     for r in records:
-        trainee = db.query(Trainee).filter(Trainee.id == r.trainee_id).first()
         rows.append({
             "Date": str(r.date),
-            "Name": trainee.unique_name if trainee else "Unknown",
+            "Name": trainee_map.get(r.trainee_id, "Unknown"),
             "Check-in": r.checkin_time.strftime("%H:%M:%S") if r.checkin_time else "",
             "Check-out": r.checkout_time.strftime("%H:%M:%S") if r.checkout_time else "",
             "Status": r.status or "",

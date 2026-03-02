@@ -5,6 +5,7 @@ import {
   getTrainees,
   patchAttendance,
   deleteAttendance,
+  imageUrl,
 } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
 
@@ -259,25 +260,21 @@ export default function AdminHistory() {
                             <div className="flex gap-1">
                               {r.checkin_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkin_image}`}
+                                  src={imageUrl(r.checkin_image)}
                                   alt="Check-in"
                                   className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkin_image}`,
-                                    )
+                                    setPreviewImage(imageUrl(r.checkin_image))
                                   }
                                 />
                               )}
                               {r.checkout_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkout_image}`}
+                                  src={imageUrl(r.checkout_image)}
                                   alt="Check-out"
                                   className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkout_image}`,
-                                    )
+                                    setPreviewImage(imageUrl(r.checkout_image))
                                   }
                                 />
                               )}
@@ -354,27 +351,23 @@ export default function AdminHistory() {
                             <div className="flex gap-1">
                               {r.checkin_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkin_image}`}
+                                  src={imageUrl(r.checkin_image)}
                                   alt="Check-in"
                                   className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500 transition"
                                   title="Check-in capture"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkin_image}`,
-                                    )
+                                    setPreviewImage(imageUrl(r.checkin_image))
                                   }
                                 />
                               )}
                               {r.checkout_image && (
                                 <img
-                                  src={`http://localhost:8000${r.checkout_image}`}
+                                  src={imageUrl(r.checkout_image)}
                                   alt="Check-out"
                                   className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500 transition"
                                   title="Check-out capture"
                                   onClick={() =>
-                                    setPreviewImage(
-                                      `http://localhost:8000${r.checkout_image}`,
-                                    )
+                                    setPreviewImage(imageUrl(r.checkout_image))
                                   }
                                 />
                               )}
