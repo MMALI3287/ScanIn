@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { exportReport } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
+import { useDarkMode } from "../DarkModeContext";
 
 function getWeekRange() {
   const now = new Date();
@@ -15,6 +16,7 @@ function getWeekRange() {
 }
 
 export default function AdminReports() {
+  const { dark } = useDarkMode();
   const navigate = useNavigate();
   const week = getWeekRange();
 
@@ -64,28 +66,28 @@ export default function AdminReports() {
 
   return (
     <AdminLayout title="Export Reports">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+      <div className={`${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"} border rounded-xl p-6 max-w-lg`}>
         <div className="flex gap-4 mb-6">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-400 mb-1">
+            <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
               From
             </label>
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className={`w-full ${dark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-50 border-gray-300 text-gray-900"} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500`}
             />
           </div>
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-400 mb-1">
+            <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
               To
             </label>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className={`w-full ${dark ? "bg-gray-800 border-gray-700 text-white" : "bg-gray-50 border-gray-300 text-gray-900"} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500`}
             />
           </div>
         </div>

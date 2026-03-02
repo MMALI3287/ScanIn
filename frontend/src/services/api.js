@@ -52,6 +52,9 @@ export const identifyFace = (frame) =>
 export const getAttendance = (params) => api.get("/attendance", { params });
 export const getMyAttendance = (params) =>
   api.get("/attendance/my", { params });
+export const getPublicHistory = (params) =>
+  api.get("/attendance/history", { params });
+export const getPublicTrainees = () => api.get("/trainees/public");
 export const patchAttendance = (id, data) =>
   api.patch(`/attendance/${id}`, data);
 export const deleteAttendance = (id) => api.delete(`/attendance/${id}`);
@@ -67,5 +70,8 @@ export const exportReport = (format, from, to) =>
 export const getSettings = () => api.get("/settings");
 export const updateSetting = (key, value) =>
   api.patch("/settings", { key, value });
+
+// Analytics
+export const getWeeklyAnalytics = () => api.get("/analytics/weekly");
 
 export default api;

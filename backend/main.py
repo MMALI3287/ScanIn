@@ -1,8 +1,8 @@
 import os
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, timedelta
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from passlib.context import CryptContext
@@ -13,6 +13,7 @@ from database import engine, SessionLocal, Base
 from models import Admin, Setting, Trainee, Attendance
 from routers import auth, trainees, attendance as attendance_router, reports, settings
 from services.notification_service import alert_admin_absent, SMTP_USER
+from ws_manager import manager
 
 scheduler = AsyncIOScheduler()
 
@@ -111,3 +112,42 @@ def seed_defaults():
 @app.get("/")
 async def root():
     return {"message": "Face Attendance System API"}
+
+
+@app.websocket("/ws/attendance")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+
+@app.get("/api/v1/analytics/weekly")
+async def weekly_analytics():
+    """Return attendance stats for the last 7 days for dashboard charts."""
+    db = SessionLocal()
+    try:
+        today = date.today()
+        days = []
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            records = db.query(Attendance).filter(Attendance.date == d).all()
+            total_trainees = db.query(Trainee).count()
+            present = sum(1 for r in records if r.status == "present")
+            late = sum(1 for r in records if r.status == "late")
+            absent = total_trainees - present - late
+            if absent < 0:
+                absent = 0
+            days.append({
+                "date": d.isoformat(),
+                "label": d.strftime("%a"),
+                "present": present,
+                "late": late,
+                "absent": absent,
+                "total": total_trainees,
+            })
+        return {"success": True, "data": days}
+    finally:
+        db.close()

@@ -13,6 +13,14 @@ from services.face_service import get_embedding, average_embeddings
 router = APIRouter(prefix="/api/v1/trainees", tags=["trainees"])
 
 
+@router.get("/public", response_model=APIResponse)
+async def list_trainees_public(db: Session = Depends(get_db)):
+    """Public endpoint — returns only id and unique_name for the history dropdown."""
+    trainees = db.query(Trainee.id, Trainee.unique_name).order_by(Trainee.unique_name).all()
+    data = [{"id": t.id, "unique_name": t.unique_name} for t in trainees]
+    return APIResponse(success=True, data=data, message="Trainee list retrieved")
+
+
 @router.get("", response_model=APIResponse)
 async def list_trainees(db: Session = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     trainees = db.query(Trainee).all()
@@ -41,9 +49,16 @@ async def register_self(body: TraineeSelfRegister, db: Session = Depends(get_db)
     for frame_b64 in body.frames:
         try:
             emb = await get_embedding(frame_b64)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-        embeddings.append(emb)
+            embeddings.append(emb)
+        except ValueError:
+            # Skip frames where MTCNN cannot detect a face (e.g. profile/angled shots)
+            pass
+
+    if not embeddings:
+        raise HTTPException(
+            status_code=400,
+            detail="No face could be detected in any of the captured frames. Please retake your photos in good lighting with your face clearly visible.",
+        )
 
     trainee = Trainee(unique_name=body.unique_name, registered_by="self")
     if body.email:
