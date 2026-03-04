@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useDarkMode } from "../DarkModeContext";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 export default function AttendanceTable({ records, onEdit }) {
   const { dark } = useDarkMode();

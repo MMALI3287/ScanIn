@@ -1,10 +1,9 @@
-from fastapi import WebSocket
 from typing import List
+
+from fastapi import WebSocket
 
 
 class ConnectionManager:
-    """Manages WebSocket connections for real-time attendance updates."""
-
     def __init__(self):
         self.active_connections: List[WebSocket] = []
 

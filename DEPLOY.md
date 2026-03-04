@@ -179,8 +179,8 @@ Then update `nginx.conf` to use SSL certificates and change the compose port to 
 
 ## Notes
 
-- **SQLite database** is stored at `backend/attendance.db` and persisted via Docker volume
-- **Captured images** are stored at `backend/captures/` and also persisted
+- **Database** is hosted on NeonDB (PostgreSQL) — no local DB file or volume needed
+- **Captured images** are stored in Cloudflare R2 — no local volume needed
 - **First login**: username `admin`, password `admin123` — change immediately in Settings
 - The FaceNet model (~100MB) downloads on first startup, so the first boot takes a few minutes
 - ARM64 is fully supported — PyTorch CPU and facenet-pytorch work natively on Ampere

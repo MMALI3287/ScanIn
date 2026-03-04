@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getTrainees, deleteTrainee, registerByAdmin } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
-import { useDarkMode } from "../DarkModeContext";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 const PAGE_SIZE = 15;
 

@@ -1,21 +1,45 @@
 services:
   backend:
     build: ./backend
+    container_name: scanin-backend
     restart: unless-stopped
     env_file: ./backend/.env
     volumes:
-      - ./backend/attendance.db:/app/attendance.db
-      - ./backend/captures:/app/captures
+      - facenet_cache:/app/.torch_cache
     ports:
       - "8000:8000"
+    networks:
+      - scanin-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   frontend:
-    image: nginx:alpine
+    build: ./frontend
+    container_name: scanin-frontend
     restart: unless-stopped
     ports:
       - "80:80"
     volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - scanin-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  scanin-net:
+    driver: bridge
+
+volumes:
+  facenet_cache:

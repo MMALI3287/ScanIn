@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { exportReport } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
-import { useDarkMode } from "../DarkModeContext";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 function getWeekRange() {
   const now = new Date();
@@ -66,10 +66,14 @@ export default function AdminReports() {
 
   return (
     <AdminLayout title="Export Reports">
-      <div className={`${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"} border rounded-xl p-6 max-w-lg`}>
+      <div
+        className={`${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"} border rounded-xl p-6 max-w-lg`}
+      >
         <div className="flex gap-4 mb-6">
           <div className="flex-1">
-            <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
+            <label
+              className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}
+            >
               From
             </label>
             <input
@@ -80,7 +84,9 @@ export default function AdminReports() {
             />
           </div>
           <div className="flex-1">
-            <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
+            <label
+              className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}
+            >
               To
             </label>
             <input

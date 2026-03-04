@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import base64
 import numpy as np
 import torch
@@ -7,7 +8,8 @@ from PIL import Image
 from facenet_pytorch import MTCNN, InceptionResnetV1
 from sqlalchemy.orm import Session
 
-print("Loading FaceNet model (MTCNN + InceptionResnetV1)...")
+_logger = logging.getLogger(__name__)
+_logger.info("Loading FaceNet model (MTCNN + InceptionResnetV1)...")
 _mtcnn = MTCNN(
     image_size=160,
     margin=40,
@@ -17,7 +19,7 @@ _mtcnn = MTCNN(
     thresholds=[0.5, 0.6, 0.6],
 )
 _resnet = InceptionResnetV1(pretrained="vggface2").eval()
-print("FaceNet model loaded.")
+_logger.info("FaceNet model loaded.")
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

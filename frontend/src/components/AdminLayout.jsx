@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Sidebar from "./Sidebar";
-import { useDarkMode } from "../DarkModeContext";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 export default function AdminLayout({ title, children }) {
   const { dark } = useDarkMode();
@@ -13,7 +13,9 @@ export default function AdminLayout({ title, children }) {
   }, [toast]);
 
   return (
-    <div className={`min-h-screen flex ${dark ? "bg-gray-950" : "bg-gray-100"}`}>
+    <div
+      className={`min-h-screen flex ${dark ? "bg-gray-950" : "bg-gray-100"}`}
+    >
       <Sidebar />
 
       {/* Toast */}
@@ -30,12 +32,32 @@ export default function AdminLayout({ title, children }) {
           }`}
         >
           {toast.type === "success" ? (
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            <svg
+              className="w-4 h-4 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           ) : (
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-4 h-4 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           )}
           {toast.text}
@@ -44,7 +66,11 @@ export default function AdminLayout({ title, children }) {
 
       <main className="flex-1 p-8 overflow-auto">
         {title && (
-          <h1 className={`text-2xl font-bold mb-6 ${dark ? "text-white" : "text-gray-900"}`}>{title}</h1>
+          <h1
+            className={`text-2xl font-bold mb-6 ${dark ? "text-white" : "text-gray-900"}`}
+          >
+            {title}
+          </h1>
         )}
         {typeof children === "function" ? children({ setToast }) : children}
       </main>

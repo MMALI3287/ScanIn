@@ -1,9 +1,13 @@
-import os
 import base64
+import logging
 import uuid
 from datetime import datetime, date, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
+from core.limiter import limiter
+
+logger = logging.getLogger(__name__)
 
 from database import get_db
 from models import Trainee, Attendance, Setting
@@ -12,19 +16,16 @@ from dependencies import get_current_admin
 from services.face_service import get_embedding, find_best_match
 from services.liveness_service import check_liveness
 from services.notification_service import send_email
-from ws_manager import manager
+from services.storage_service import upload_capture, get_capture_url
+from core.ws_manager import manager
 
 router = APIRouter(prefix="/api/v1/attendance", tags=["attendance"])
-
-CAPTURES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "captures")
-os.makedirs(CAPTURES_DIR, exist_ok=True)
 
 
 def save_capture(frame_b64: str) -> str:
     filename = f"{uuid.uuid4().hex}.jpg"
-    filepath = os.path.join(CAPTURES_DIR, filename)
-    with open(filepath, "wb") as f:
-        f.write(base64.b64decode(frame_b64))
+    image_bytes = base64.b64decode(frame_b64)
+    upload_capture(filename, image_bytes)
     return filename
 
 
@@ -50,7 +51,8 @@ def compute_status(checkin_time: datetime, work_start: str, grace_minutes: int =
 
 
 @router.post("/identify", response_model=APIResponse)
-async def identify(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
+@limiter.limit("1 per 10 seconds")
+async def identify(request: Request, body: AttendanceFrameRequest, db: Session = Depends(get_db)):
     if is_liveness_enabled(db):
         is_live = await check_liveness(body.frame)
         if not is_live:
@@ -88,7 +90,8 @@ async def identify(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/checkin", response_model=APIResponse)
-async def checkin(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
+@limiter.limit("1 per 10 seconds")
+async def checkin(request: Request, body: AttendanceFrameRequest, db: Session = Depends(get_db)):
     if is_liveness_enabled(db):
         is_live = await check_liveness(body.frame)
         if not is_live:
@@ -173,7 +176,8 @@ async def checkin(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/checkout", response_model=APIResponse)
-async def checkout(body: AttendanceFrameRequest, db: Session = Depends(get_db)):
+@limiter.limit("1 per 10 seconds")
+async def checkout(request: Request, body: AttendanceFrameRequest, db: Session = Depends(get_db)):
     is_live = await check_liveness(body.frame)
     if not is_live:
         raise HTTPException(status_code=400, detail="Liveness check failed. Please look at the camera naturally.")
@@ -261,8 +265,8 @@ async def get_attendance(
             date=r.date,
             checkin_time=r.checkin_time,
             checkout_time=r.checkout_time,
-            checkin_image=f"/captures/{r.checkin_image}" if r.checkin_image else None,
-            checkout_image=f"/captures/{r.checkout_image}" if r.checkout_image else None,
+            checkin_image=get_capture_url(r.checkin_image) if r.checkin_image else None,
+            checkout_image=get_capture_url(r.checkout_image) if r.checkout_image else None,
             status=r.status,
         )
         data.append(item.model_dump())
@@ -343,8 +347,8 @@ async def get_my_attendance(
             date=r.date,
             checkin_time=r.checkin_time,
             checkout_time=r.checkout_time,
-            checkin_image=f"/captures/{r.checkin_image}" if r.checkin_image else None,
-            checkout_image=f"/captures/{r.checkout_image}" if r.checkout_image else None,
+            checkin_image=get_capture_url(r.checkin_image) if r.checkin_image else None,
+            checkout_image=get_capture_url(r.checkout_image) if r.checkout_image else None,
             status=r.status,
         )
         data.append(item.model_dump())
@@ -383,8 +387,8 @@ async def get_public_history(
             date=r.date,
             checkin_time=r.checkin_time,
             checkout_time=r.checkout_time,
-            checkin_image=f"/captures/{r.checkin_image}" if r.checkin_image else None,
-            checkout_image=f"/captures/{r.checkout_image}" if r.checkout_image else None,
+            checkin_image=get_capture_url(r.checkin_image) if r.checkin_image else None,
+            checkout_image=get_capture_url(r.checkout_image) if r.checkout_image else None,
             status=r.status,
         )
         data.append(item.model_dump())
@@ -401,13 +405,9 @@ def _send_attendance_email(trainee: Trainee, action: str, time: datetime, image_
     date_str = time.strftime("%B %d, %Y")
 
     image_tag = ""
-    image_bytes = None
     if image_filename:
-        image_path = os.path.join(CAPTURES_DIR, image_filename)
-        if os.path.exists(image_path):
-            with open(image_path, "rb") as f:
-                image_bytes = f.read()
-            image_tag = '<br><img src="cid:capture" style="max-width:320px;border-radius:12px;border:2px solid #e5e7eb;margin-top:12px;">'
+        image_url = get_capture_url(image_filename)
+        image_tag = f'<br><img src="{image_url}" style="max-width:320px;border-radius:12px;border:2px solid #e5e7eb;margin-top:12px;">'
 
     body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;background:#f9fafb;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
@@ -433,7 +433,7 @@ def _send_attendance_email(trainee: Trainee, action: str, time: datetime, image_
     </div>
     """
     try:
-        send_email(trainee.email, f"ScanIn {action_label} — {time_str}", body, image_bytes)
-        print(f"[email] Sent {action} email to {trainee.email}")
+        send_email(trainee.email, f"ScanIn {action_label} — {time_str}", body)
+        logger.info("Sent %s email to %s", action, trainee.email)
     except Exception as e:
-        print(f"[email] Failed to send {action} email to {trainee.email}: {e}")
+        logger.error("Failed to send %s email to %s: %s", action, trainee.email, e)

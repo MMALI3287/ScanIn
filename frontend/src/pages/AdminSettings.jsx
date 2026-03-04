@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSettings, updateSetting, changePassword } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
-import { useDarkMode } from "../DarkModeContext";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 export default function AdminSettings() {
   const { dark } = useDarkMode();

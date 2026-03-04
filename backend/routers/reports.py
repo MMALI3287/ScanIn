@@ -39,7 +39,7 @@ def get_attendance_data(db: Session, from_date: date, to_date: date) -> list[dic
 
 @router.get("/export")
 async def export_report(
-    format: str = Query("excel", regex="^(excel|pdf)$"),
+    format: str = Query("excel", pattern="^(excel|pdf)$"),
     from_date: date = Query(None, alias="from"),
     to_date: date = Query(None, alias="to"),
     db: Session = Depends(get_db),

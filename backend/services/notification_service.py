@@ -1,4 +1,5 @@
 import os
+import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -6,6 +7,8 @@ from email.mime.image import MIMEImage
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -18,10 +21,10 @@ SMTP_FROM = os.getenv("SMTP_FROM", "") or SMTP_USER
 
 def send_email(to: str, subject: str, body: str, image_bytes: bytes | None = None) -> None:
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        print("[email] SMTP not configured — skipping email to", to)
+        logger.debug("SMTP not configured — skipping email to %s", to)
         return
     if not SMTP_FROM:
-        print("[email] SMTP_FROM not set — skipping email to", to)
+        logger.debug("SMTP_FROM not set — skipping email to %s", to)
         return
 
     if image_bytes:
@@ -65,4 +68,4 @@ def alert_admin_absent(admin_email: str, absent_trainees: list[str]) -> None:
     try:
         send_email(admin_email, "Absent Trainees Alert", body)
     except Exception as e:
-        print(f"Failed to send absent alert email: {e}")
+        logger.error("Failed to send absent alert email: %s", e)

@@ -8,7 +8,7 @@ import {
   imageUrl,
 } from "../services/api";
 import AdminLayout from "../components/AdminLayout";
-import { useDarkMode } from "../DarkModeContext";
+import { useDarkMode } from "../contexts/DarkModeContext";
 
 const PAGE_SIZE = 15;
 
@@ -125,7 +125,9 @@ export default function AdminHistory() {
             {/* Filters */}
             <div className="flex flex-wrap gap-4 items-end mb-6">
               <div>
-                <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
+                <label
+                  className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}
+                >
                   Trainee
                 </label>
                 <select
@@ -142,7 +144,9 @@ export default function AdminHistory() {
                 </select>
               </div>
               <div>
-                <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
+                <label
+                  className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}
+                >
                   From
                 </label>
                 <input
@@ -153,7 +157,9 @@ export default function AdminHistory() {
                 />
               </div>
               <div>
-                <label className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}>
+                <label
+                  className={`block text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"} mb-1`}
+                >
                   To
                 </label>
                 <input
@@ -197,296 +203,355 @@ export default function AdminHistory() {
               </div>
             ) : (
               <>
-              <div className="overflow-x-auto">
-                <table className={`w-full border-collapse ${dark ? "bg-gray-900" : "bg-white"} rounded-lg overflow-hidden`}>
-                  <thead>
-                    <tr className={`${dark ? "bg-gray-800" : "bg-gray-50"} text-left text-sm font-semibold ${dark ? "text-gray-400" : "text-gray-500"}`}>
-                      <th className="p-3">Name</th>
-                      <th className="p-3">Date</th>
-                      <th className="p-3">Check-in</th>
-                      <th className="p-3">Check-out</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Images</th>
-                      <th className="p-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {records.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((r) =>
-                      editingId === r.id ? (
-                        <tr
-                          key={r.id}
-                          className={`${dark ? "border-t border-gray-800 bg-gray-800/50" : "border-t border-gray-200 bg-gray-50"}`}
-                        >
-                          <td className={`p-3 font-medium ${dark ? "text-white" : "text-gray-900"}`}>
-                            {r.trainee_name}
-                          </td>
-                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>{r.date}</td>
-                          <td className="p-3">
-                            <input
-                              type="datetime-local"
-                              value={editForm.checkin_time}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  checkin_time: e.target.value,
-                                })
-                              }
-                              className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
-                            />
-                          </td>
-                          <td className="p-3">
-                            <input
-                              type="datetime-local"
-                              value={editForm.checkout_time}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  checkout_time: e.target.value,
-                                })
-                              }
-                              className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
-                            />
-                          </td>
-                          <td className="p-3">
-                            <select
-                              value={editForm.status}
-                              onChange={(e) =>
-                                setEditForm({
-                                  ...editForm,
-                                  status: e.target.value,
-                                })
-                              }
-                              className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500`}
+                <div className="overflow-x-auto">
+                  <table
+                    className={`w-full border-collapse ${dark ? "bg-gray-900" : "bg-white"} rounded-lg overflow-hidden`}
+                  >
+                    <thead>
+                      <tr
+                        className={`${dark ? "bg-gray-800" : "bg-gray-50"} text-left text-sm font-semibold ${dark ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        <th className="p-3">Name</th>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Check-in</th>
+                        <th className="p-3">Check-out</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Images</th>
+                        <th className="p-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {records
+                        .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+                        .map((r) =>
+                          editingId === r.id ? (
+                            <tr
+                              key={r.id}
+                              className={`${dark ? "border-t border-gray-800 bg-gray-800/50" : "border-t border-gray-200 bg-gray-50"}`}
                             >
-                              <option value="present">present</option>
-                              <option value="late">late</option>
-                              <option value="absent">absent</option>
-                            </select>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex gap-1">
-                              {r.checkin_image && (
-                                <img
-                                  src={imageUrl(r.checkin_image)}
-                                  alt="Check-in"
-                                  className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
-                                  onClick={() =>
-                                    setPreviewImage(imageUrl(r.checkin_image))
-
-                                  }
-                                />
-                              )}
-                              {r.checkout_image && (
-                                <img
-                                  src={imageUrl(r.checkout_image)}
-                                  alt="Check-out"
-                                  className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
-                                  onClick={() =>
-                                    setPreviewImage(imageUrl(r.checkout_image))
-
-                                  }
-                                />
-                              )}
-                              {!r.checkin_image && !r.checkout_image && (
-                                <span className="text-gray-600 text-xs">—</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => saveEdit(r.id)}
-                                disabled={saving}
-                                className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/40 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                              <td
+                                className={`p-3 font-medium ${dark ? "text-white" : "text-gray-900"}`}
                               >
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M4.5 12.75l6 6 9-13.5"
-                                  />
-                                </svg>
-                                {saving ? "Saving…" : "Save"}
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-gray-300 border border-gray-600/30 hover:border-gray-600/60 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                                {r.trainee_name}
+                              </td>
+                              <td
+                                className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}
                               >
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M6 18L18 6M6 6l12 12"
-                                  />
-                                </svg>
-                                Cancel
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr
-                          key={r.id}
-                          className={`${dark ? "border-t border-gray-800 hover:bg-gray-800/50" : "border-t border-gray-100 hover:bg-gray-50"}`}
-                        >
-                          <td className={`p-3 font-medium ${dark ? "text-white" : "text-gray-900"}`}>
-                            {r.trainee_name}
-                          </td>
-                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>{r.date}</td>
-                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>
-                            {r.checkin_time
-                              ? new Date(r.checkin_time).toLocaleTimeString()
-                              : "—"}
-                          </td>
-                          <td className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}>
-                            {r.checkout_time
-                              ? new Date(r.checkout_time).toLocaleTimeString()
-                              : "—"}
-                          </td>
-                          <td className="p-3">{statusBadge(r.status)}</td>
-                          <td className="p-3">
-                            <div className="flex gap-1">
-                              {r.checkin_image && (
-                                <img
-                                  src={imageUrl(r.checkin_image)}
-
-                                  alt="Check-in"
-                                  className={`w-8 h-8 rounded object-cover cursor-pointer border ${dark ? "border-gray-600" : "border-gray-300"} hover:border-cyan-500 transition`}
-                                  title="Check-in capture"
-                                  onClick={() =>
-                                    setPreviewImage(imageUrl(r.checkin_image))
-
+                                {r.date}
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="datetime-local"
+                                  value={editForm.checkin_time}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      checkin_time: e.target.value,
+                                    })
                                   }
+                                  className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                                 />
-                              )}
-                              {r.checkout_image && (
-                                <img
-                                  src={imageUrl(r.checkout_image)}
-
-                                  alt="Check-out"
-                                  className={`w-8 h-8 rounded object-cover cursor-pointer border ${dark ? "border-gray-600" : "border-gray-300"} hover:border-cyan-500 transition`}
-                                  title="Check-out capture"
-                                  onClick={() =>
-                                    setPreviewImage(imageUrl(r.checkout_image))
-
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="datetime-local"
+                                  value={editForm.checkout_time}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      checkout_time: e.target.value,
+                                    })
                                   }
+                                  className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                                 />
-                              )}
-                              {!r.checkin_image && !r.checkout_image && (
-                                <span className="text-gray-600 text-xs">—</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => startEdit(r)}
-                                className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/40 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5"
-                              >
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
+                              </td>
+                              <td className="p-3">
+                                <select
+                                  value={editForm.status}
+                                  onChange={(e) =>
+                                    setEditForm({
+                                      ...editForm,
+                                      status: e.target.value,
+                                    })
+                                  }
+                                  className={`${dark ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-100 border-gray-300 text-gray-900"} border rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500`}
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
-                                  />
-                                </svg>
-                                Edit
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setConfirmDelete({
-                                    id: r.id,
-                                    name: r.trainee_name,
-                                    date: r.date,
-                                  })
-                                }
-                                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                                  <option value="present">present</option>
+                                  <option value="late">late</option>
+                                  <option value="absent">absent</option>
+                                </select>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex gap-1">
+                                  {r.checkin_image && (
+                                    <img
+                                      src={imageUrl(r.checkin_image)}
+                                      alt="Check-in"
+                                      className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
+                                      onClick={() =>
+                                        setPreviewImage(
+                                          imageUrl(r.checkin_image),
+                                        )
+                                      }
+                                    />
+                                  )}
+                                  {r.checkout_image && (
+                                    <img
+                                      src={imageUrl(r.checkout_image)}
+                                      alt="Check-out"
+                                      className="w-8 h-8 rounded object-cover cursor-pointer border border-gray-600 hover:border-cyan-500"
+                                      onClick={() =>
+                                        setPreviewImage(
+                                          imageUrl(r.checkout_image),
+                                        )
+                                      }
+                                    />
+                                  )}
+                                  {!r.checkin_image && !r.checkout_image && (
+                                    <span className="text-gray-600 text-xs">
+                                      —
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => saveEdit(r.id)}
+                                    disabled={saving}
+                                    className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/40 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                  >
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M4.5 12.75l6 6 9-13.5"
+                                      />
+                                    </svg>
+                                    {saving ? "Saving…" : "Save"}
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-gray-300 border border-gray-600/30 hover:border-gray-600/60 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr
+                              key={r.id}
+                              className={`${dark ? "border-t border-gray-800 hover:bg-gray-800/50" : "border-t border-gray-100 hover:bg-gray-50"}`}
+                            >
+                              <td
+                                className={`p-3 font-medium ${dark ? "text-white" : "text-gray-900"}`}
                               >
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                                  />
-                                </svg>
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ),
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              {records.length > PAGE_SIZE && (
-                <div className="flex items-center justify-between mt-4 px-1">
-                  <p className={`text-sm ${dark ? "text-gray-500" : "text-gray-400"}`}>
-                    Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, records.length)} of {records.length}
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                    >
-                      Previous
-                    </button>
-                    {Array.from({ length: Math.ceil(records.length / PAGE_SIZE) }, (_, i) => i + 1)
-                      .filter((p) => p === 1 || p === Math.ceil(records.length / PAGE_SIZE) || Math.abs(p - page) <= 1)
-                      .map((p, idx, arr) => (
-                        <span key={p} className="flex items-center">
-                          {idx > 0 && arr[idx - 1] !== p - 1 && <span className={`px-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>…</span>}
-                          <button
-                            onClick={() => setPage(p)}
-                            className={`w-8 h-8 rounded-lg text-sm font-medium transition cursor-pointer ${p === page ? "bg-cyan-600 text-white" : dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                          >
-                            {p}
-                          </button>
-                        </span>
-                      ))}
-                    <button
-                      onClick={() => setPage((p) => Math.min(Math.ceil(records.length / PAGE_SIZE), p + 1))}
-                      disabled={page >= Math.ceil(records.length / PAGE_SIZE)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                    >
-                      Next
-                    </button>
-                  </div>
+                                {r.trainee_name}
+                              </td>
+                              <td
+                                className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}
+                              >
+                                {r.date}
+                              </td>
+                              <td
+                                className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}
+                              >
+                                {r.checkin_time
+                                  ? new Date(
+                                      r.checkin_time,
+                                    ).toLocaleTimeString()
+                                  : "—"}
+                              </td>
+                              <td
+                                className={`p-3 ${dark ? "text-gray-300" : "text-gray-600"}`}
+                              >
+                                {r.checkout_time
+                                  ? new Date(
+                                      r.checkout_time,
+                                    ).toLocaleTimeString()
+                                  : "—"}
+                              </td>
+                              <td className="p-3">{statusBadge(r.status)}</td>
+                              <td className="p-3">
+                                <div className="flex gap-1">
+                                  {r.checkin_image && (
+                                    <img
+                                      src={imageUrl(r.checkin_image)}
+                                      alt="Check-in"
+                                      className={`w-8 h-8 rounded object-cover cursor-pointer border ${dark ? "border-gray-600" : "border-gray-300"} hover:border-cyan-500 transition`}
+                                      title="Check-in capture"
+                                      onClick={() =>
+                                        setPreviewImage(
+                                          imageUrl(r.checkin_image),
+                                        )
+                                      }
+                                    />
+                                  )}
+                                  {r.checkout_image && (
+                                    <img
+                                      src={imageUrl(r.checkout_image)}
+                                      alt="Check-out"
+                                      className={`w-8 h-8 rounded object-cover cursor-pointer border ${dark ? "border-gray-600" : "border-gray-300"} hover:border-cyan-500 transition`}
+                                      title="Check-out capture"
+                                      onClick={() =>
+                                        setPreviewImage(
+                                          imageUrl(r.checkout_image),
+                                        )
+                                      }
+                                    />
+                                  )}
+                                  {!r.checkin_image && !r.checkout_image && (
+                                    <span className="text-gray-600 text-xs">
+                                      —
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => startEdit(r)}
+                                    className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/40 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
+                                      />
+                                    </svg>
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setConfirmDelete({
+                                        id: r.id,
+                                        name: r.trainee_name,
+                                        date: r.date,
+                                      })
+                                    }
+                                    className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 text-sm font-medium px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5"
+                                  >
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                                      />
+                                    </svg>
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ),
+                        )}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+
+                {/* Pagination */}
+                {records.length > PAGE_SIZE && (
+                  <div className="flex items-center justify-between mt-4 px-1">
+                    <p
+                      className={`text-sm ${dark ? "text-gray-500" : "text-gray-400"}`}
+                    >
+                      Showing {(page - 1) * PAGE_SIZE + 1}–
+                      {Math.min(page * PAGE_SIZE, records.length)} of{" "}
+                      {records.length}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      >
+                        Previous
+                      </button>
+                      {Array.from(
+                        { length: Math.ceil(records.length / PAGE_SIZE) },
+                        (_, i) => i + 1,
+                      )
+                        .filter(
+                          (p) =>
+                            p === 1 ||
+                            p === Math.ceil(records.length / PAGE_SIZE) ||
+                            Math.abs(p - page) <= 1,
+                        )
+                        .map((p, idx, arr) => (
+                          <span key={p} className="flex items-center">
+                            {idx > 0 && arr[idx - 1] !== p - 1 && (
+                              <span
+                                className={`px-1 ${dark ? "text-gray-600" : "text-gray-400"}`}
+                              >
+                                …
+                              </span>
+                            )}
+                            <button
+                              onClick={() => setPage(p)}
+                              className={`w-8 h-8 rounded-lg text-sm font-medium transition cursor-pointer ${p === page ? "bg-cyan-600 text-white" : dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                            >
+                              {p}
+                            </button>
+                          </span>
+                        ))}
+                      <button
+                        onClick={() =>
+                          setPage((p) =>
+                            Math.min(
+                              Math.ceil(records.length / PAGE_SIZE),
+                              p + 1,
+                            ),
+                          )
+                        }
+                        disabled={page >= Math.ceil(records.length / PAGE_SIZE)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${dark ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             {/* Confirm Delete Modal */}
             {confirmDelete && (
               <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-                <div className={`${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"} border rounded-xl p-6 w-full max-w-sm shadow-lg text-center`}>
+                <div
+                  className={`${dark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"} border rounded-xl p-6 w-full max-w-sm shadow-lg text-center`}
+                >
                   <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
                     <svg
                       className="w-6 h-6 text-red-400"
@@ -502,16 +567,24 @@ export default function AdminHistory() {
                       />
                     </svg>
                   </div>
-                  <h3 className={`text-lg font-semibold ${dark ? "text-white" : "text-gray-900"} mb-2`}>
+                  <h3
+                    className={`text-lg font-semibold ${dark ? "text-white" : "text-gray-900"} mb-2`}
+                  >
                     Delete Attendance Record
                   </h3>
-                  <p className={`${dark ? "text-gray-400" : "text-gray-500"} text-sm mb-6`}>
+                  <p
+                    className={`${dark ? "text-gray-400" : "text-gray-500"} text-sm mb-6`}
+                  >
                     Delete the record for{" "}
-                    <span className={`${dark ? "text-white" : "text-gray-900"} font-medium`}>
+                    <span
+                      className={`${dark ? "text-white" : "text-gray-900"} font-medium`}
+                    >
                       "{confirmDelete.name}"
                     </span>{" "}
                     on{" "}
-                    <span className={`${dark ? "text-white" : "text-gray-900"} font-medium`}>
+                    <span
+                      className={`${dark ? "text-white" : "text-gray-900"} font-medium`}
+                    >
                       {confirmDelete.date}
                     </span>
                     ?
